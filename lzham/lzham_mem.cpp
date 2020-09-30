@@ -2,6 +2,8 @@
 // See Copyright Notice and license at the end of include/lzham.h
 #include "lzham_core.h"
 
+#include <malloc.h>
+
 #ifdef __APPLE__
    #include <malloc/malloc.h>
 #elif defined(__FreeBSD__) || defined(__NetBSD__)
@@ -17,13 +19,13 @@ using namespace lzham;
 
 #define LZHAM_MEM_STATS 0
 
-#ifndef LZHAM_USE_WIN32_API
+/*#ifndef LZHAM_USE_WIN32_API
    #ifndef __APPLE__
       #define _msize malloc_usable_size
    #else
       #define _msize malloc_size
    #endif
-#endif
+#endif*/
 
 namespace lzham
 {

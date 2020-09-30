@@ -2,6 +2,8 @@
 // See Copyright Notice and license at the end of include/lzham.h
 #pragma once
 
+#include <cstring>
+
 namespace lzham
 {
    struct elemental_vector
