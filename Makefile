@@ -23,19 +23,9 @@ COMPILER = $(shell $(CC) -v 2>&1 | grep -q "clang version" && echo clang || echo
 GCC_VERSION = $(shell echo | $(CC) -dM -E - | grep __VERSION__  | sed -e 's:\#define __VERSION__ "\([0-9.]*\).*:\1:' -e 's:\.\([0-9][0-9]\):\1:g' -e 's:\.\([0-9]\):0\1:g')
 CLANG_VERSION = $(shell $(CC) -v 2>&1 | grep "clang version" | sed -e 's:.*version \([0-9.]*\).*:\1:' -e 's:\.\([0-9][0-9]\):\1:g' -e 's:\.\([0-9]\):0\1:g')
 
-# glza doesn't work with gcc < 4.9 and clang < 3.6 (missing stdatomic.h)
-ifeq (1,$(filter 1,$(shell [ "$(COMPILER)" = "gcc" ] && expr $(GCC_VERSION) \< 40900) $(shell [ "$(COMPILER)" = "clang" ] && expr $(CLANG_VERSION) \< 30600)))
-    DONT_BUILD_GLZA ?= 1
-endif
-
 # LZSSE requires compiler with __SSE4_1__ support and 64-bit CPU
 ifneq ($(shell echo|$(CC) -dM -E - -march=native|egrep -c '__(SSE4_1|x86_64)__'), 2)
     DONT_BUILD_LZSSE ?= 1
-endif
-
-# zling requires c++14
-ifeq (1,$(filter 1,$(shell [ "$(COMPILER)" = "gcc" ] && expr $(GCC_VERSION) \< 60000) $(shell [ "$(COMPILER)" = "clang" ] && expr $(CLANG_VERSION) \< 60000)))
-  DONT_BUILD_ZLING ?= 1
 endif
 
 # detect Windows
@@ -56,13 +46,10 @@ else
 	endif
 
 	# detect MacOS
-	ifeq ($(shell uname -s),Darwin)
+	detected_OS := $(shell uname -s)
+	ifeq ($(detected_OS), Darwin)
 		DONT_BUILD_LZHAM ?= 1
 		DONT_BUILD_CSC ?= 1
-	endif
-
-	ifneq ($(shell uname -s),Darwin)
-		LDFLAGS += -lrt
 	endif
 
 	LDFLAGS	+= -pthread
@@ -73,8 +60,7 @@ else
 endif
 
 
-DEFINES     += $(addprefix -I$(SOURCE_PATH),. brotli/include libcsc libdeflate xpack/common xz xz/api xz/check xz/common xz/lz xz/lzma xz/rangecoder zstd/lib zstd/lib/common)
-DEFINES     += -DHAVE_CONFIG_H -DFL2_SINGLETHREAD
+DEFINES     += $(addprefix -I$(SOURCE_PATH),. brotli/include libcsc libdeflate xpack/common)
 CODE_FLAGS  += -Wno-unknown-pragmas -Wno-sign-compare -Wno-conversion
 
 # don't use "-ffast-math" for clang < 10.0
@@ -94,8 +80,14 @@ endif
 
 CFLAGS = $(MOREFLAGS) $(CODE_FLAGS) $(OPT_FLAGS_O3) $(DEFINES)
 CFLAGS_O2 = $(MOREFLAGS) $(CODE_FLAGS) $(OPT_FLAGS_O2) $(DEFINES)
+CXXFLAGS = $(CFLAGS)
 LDFLAGS += $(MOREFLAGS)
+ifeq ($(detected_OS), Darwin)
+    CXXFLAGS += -std=c++14
+endif
 
+MISC_FILES = crush/crush.o shrinker/shrinker.o fastlz/fastlz.o pithy/pithy.o lzjb/lzjb2010.o wflz/wfLZ.o
+MISC_FILES += lzlib/lzlib.o blosclz/blosc/blosclz.o blosclz/blosc/fastcopy.o slz/src/slz.o
 
 LZO_FILES = lzo/lzo1.o lzo/lzo1a.o lzo/lzo1a_99.o lzo/lzo1b_1.o lzo/lzo1b_2.o lzo/lzo1b_3.o lzo/lzo1b_4.o lzo/lzo1b_5.o
 LZO_FILES += lzo/lzo1b_6.o lzo/lzo1b_7.o lzo/lzo1b_8.o lzo/lzo1b_9.o lzo/lzo1b_99.o lzo/lzo1b_9x.o lzo/lzo1b_cc.o
@@ -120,9 +112,13 @@ LZMAT_FILES = lzmat/lzmat_dec.o lzmat/lzmat_enc.o
 
 LZRW_FILES = lzrw/lzrw1-a.o lzrw/lzrw1.o lzrw/lzrw2.o lzrw/lzrw3.o lzrw/lzrw3-a.o
 
-LZMA_FILES = lzma/LzFind.o lzma/LzmaDec.o lzma/LzmaEnc.o
+LZMA_FILES = lzma/CpuArch.o lzma/LzFind.o lzma/LzFindOpt.o lzma/LzFindMt.o lzma/LzmaDec.o lzma/LzmaEnc.o lzma/Threads.o
 
 LZ4_FILES = lz4/lib/lz4.o lz4/lib/lz4hc.o
+
+LIZARD_FILES = lizard/lizard_compress.o lizard/lizard_decompress.o
+LIZARD_FILES += lizard/entropy/huf_compress.o lizard/entropy/huf_decompress.o lizard/entropy/entropy_common.o
+LIZARD_FILES += lizard/entropy/fse_compress.o lizard/entropy/fse_decompress.o lizard/entropy/hist.o
 
 LZF_FILES = lzf/lzf_c_ultra.o lzf/lzf_c_very.o lzf/lzf_d.o
 
@@ -135,62 +131,128 @@ BROTLI_FILES += brotli/dec/bit_reader.o brotli/dec/decode.o brotli/dec/huffman.o
 BROTLI_FILES += brotli/enc/backward_references.o brotli/enc/block_splitter.o brotli/enc/brotli_bit_stream.o brotli/enc/encode.o brotli/enc/encoder_dict.o
 BROTLI_FILES += brotli/enc/entropy_encode.o brotli/enc/fast_log.o brotli/enc/histogram.o brotli/enc/command.o brotli/enc/literal_cost.o brotli/enc/memory.o
 BROTLI_FILES += brotli/enc/metablock.o brotli/enc/static_dict.o brotli/enc/utf8_util.o brotli/enc/compress_fragment.o brotli/enc/compress_fragment_two_pass.o
-BROTLI_FILES += brotli/enc/cluster.o brotli/enc/bit_cost.o brotli/enc/backward_references_hq.o brotli/enc/dictionary_hash.o
+BROTLI_FILES += brotli/enc/cluster.o brotli/enc/bit_cost.o brotli/enc/backward_references_hq.o brotli/enc/dictionary_hash.o brotli/common/shared_dictionary.o
+BROTLI_FILES += brotli/enc/compound_dictionary.o
 
-ZSTD_FILES = zstd/lib/common/zstd_common.o
-ZSTD_FILES += zstd/lib/common/fse_decompress.o
-ZSTD_FILES += zstd/lib/common/xxhash.o
-ZSTD_FILES += zstd/lib/common/error_private.o
-ZSTD_FILES += zstd/lib/common/entropy_common.o
-ZSTD_FILES += zstd/lib/common/pool.o
-ZSTD_FILES += zstd/lib/common/debug.o
-ZSTD_FILES += zstd/lib/common/threading.o
-ZSTD_FILES += zstd/lib/compress/zstd_compress.o
-ZSTD_FILES += zstd/lib/compress/zstd_compress_literals.o
-ZSTD_FILES += zstd/lib/compress/zstd_compress_sequences.o
-ZSTD_FILES += zstd/lib/compress/zstd_compress_superblock.o
-ZSTD_FILES += zstd/lib/compress/zstdmt_compress.o
-ZSTD_FILES += zstd/lib/compress/zstd_double_fast.o
-ZSTD_FILES += zstd/lib/compress/zstd_fast.o
-ZSTD_FILES += zstd/lib/compress/zstd_lazy.o
-ZSTD_FILES += zstd/lib/compress/zstd_ldm.o
-ZSTD_FILES += zstd/lib/compress/zstd_opt.o
-ZSTD_FILES += zstd/lib/compress/fse_compress.o
-ZSTD_FILES += zstd/lib/compress/huf_compress.o
-ZSTD_FILES += zstd/lib/compress/hist.o
-ZSTD_FILES += zstd/lib/decompress/zstd_decompress.o
-ZSTD_FILES += zstd/lib/decompress/huf_decompress.o
-ZSTD_FILES += zstd/lib/decompress/zstd_ddict.o
-ZSTD_FILES += zstd/lib/decompress/huf_decompress_amd64.S
-ZSTD_FILES += zstd/lib/decompress/zstd_decompress_block.o
-ZSTD_FILES += zstd/lib/dictBuilder/cover.o
-ZSTD_FILES += zstd/lib/dictBuilder/divsufsort.o
-ZSTD_FILES += zstd/lib/dictBuilder/fastcover.o
-ZSTD_FILES += zstd/lib/dictBuilder/zdict.o
+ifeq "$(DONT_BUILD_ZSTD)" "1"
+    DEFINES += -DBENCH_REMOVE_ZSTD
+else
+	ZSTD_FILES = zstd/lib/common/zstd_common.o
+	ZSTD_FILES += zstd/lib/common/fse_decompress.o
+	ZSTD_FILES += zstd/lib/common/xxhash.o
+	ZSTD_FILES += zstd/lib/common/error_private.o
+	ZSTD_FILES += zstd/lib/common/entropy_common.o
+	ZSTD_FILES += zstd/lib/common/pool.o
+	ZSTD_FILES += zstd/lib/common/debug.o
+	ZSTD_FILES += zstd/lib/common/threading.o
+	ZSTD_FILES += zstd/lib/compress/zstd_compress.o
+	ZSTD_FILES += zstd/lib/compress/zstd_compress_literals.o
+	ZSTD_FILES += zstd/lib/compress/zstd_compress_sequences.o
+	ZSTD_FILES += zstd/lib/compress/zstd_compress_superblock.o
+	ZSTD_FILES += zstd/lib/compress/zstdmt_compress.o
+	ZSTD_FILES += zstd/lib/compress/zstd_double_fast.o
+	ZSTD_FILES += zstd/lib/compress/zstd_fast.o
+	ZSTD_FILES += zstd/lib/compress/zstd_lazy.o
+	ZSTD_FILES += zstd/lib/compress/zstd_ldm.o
+	ZSTD_FILES += zstd/lib/compress/zstd_opt.o
+	ZSTD_FILES += zstd/lib/compress/fse_compress.o
+	ZSTD_FILES += zstd/lib/compress/huf_compress.o
+	ZSTD_FILES += zstd/lib/compress/hist.o
+	ZSTD_FILES += zstd/lib/decompress/zstd_decompress.o
+	ZSTD_FILES += zstd/lib/decompress/huf_decompress.o
+	ZSTD_FILES += zstd/lib/decompress/zstd_ddict.o
+	ZSTD_FILES += zstd/lib/decompress/zstd_decompress_block.o
+	ZSTD_FILES += zstd/lib/dictBuilder/cover.o
+	ZSTD_FILES += zstd/lib/dictBuilder/divsufsort.o
+	ZSTD_FILES += zstd/lib/dictBuilder/fastcover.o
+	ZSTD_FILES += zstd/lib/dictBuilder/zdict.o
+	MISC_FILES += zstd/lib/decompress/huf_decompress_amd64.S
+endif
+
+ifeq "$(DONT_BUILD_KANZI)" "1"
+    DEFINES += -DBENCH_REMOVE_KANZI
+    KANZI_FILES =
+else
+   KANZI_FILES = kanzi-cpp/src/io/CompressedOutputStream.o
+   KANZI_FILES += kanzi-cpp/src/io/CompressedInputStream.o
+   KANZI_FILES += kanzi-cpp/src/entropy/EntropyUtils.o
+   KANZI_FILES += kanzi-cpp/src/entropy/ExpGolombEncoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/FPAQEncoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/ANSRangeEncoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/ANSRangeDecoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/BinaryEntropyDecoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/BinaryEntropyEncoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/ExpGolombDecoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/HuffmanEncoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/FPAQDecoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/TPAQPredictor.o
+   KANZI_FILES += kanzi-cpp/src/entropy/CMPredictor.o
+   KANZI_FILES += kanzi-cpp/src/entropy/HuffmanCommon.o
+   KANZI_FILES += kanzi-cpp/src/entropy/RangeDecoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/RangeEncoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/BinaryEntropyEncoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/HuffmanDecoder.o
+   KANZI_FILES += kanzi-cpp/src/entropy/BinaryEntropyDecoder.o
+   KANZI_FILES += kanzi-cpp/src/bitstream/DefaultInputBitStream.o
+   KANZI_FILES += kanzi-cpp/src/bitstream/DebugOutputBitStream.o
+   KANZI_FILES += kanzi-cpp/src/bitstream/DebugInputBitStream.o
+   KANZI_FILES += kanzi-cpp/src/bitstream/DefaultOutputBitStream.o
+   KANZI_FILES += kanzi-cpp/src/Event.o
+   KANZI_FILES += kanzi-cpp/src/Global.o
+   KANZI_FILES += kanzi-cpp/src/transform/AliasCodec.o
+   KANZI_FILES += kanzi-cpp/src/transform/BWT.o
+   KANZI_FILES += kanzi-cpp/src/transform/RLT.o
+   KANZI_FILES += kanzi-cpp/src/transform/TextCodec.o
+   KANZI_FILES += kanzi-cpp/src/transform/EXECodec.o
+   KANZI_FILES += kanzi-cpp/src/transform/SBRT.o
+   KANZI_FILES += kanzi-cpp/src/transform/ROLZCodec.o
+   KANZI_FILES += kanzi-cpp/src/transform/LZCodec.o
+   KANZI_FILES += kanzi-cpp/src/transform/SRT.o
+   KANZI_FILES += kanzi-cpp/src/transform/DivSufSort.o
+   KANZI_FILES += kanzi-cpp/src/transform/BWTBlockCodec.o
+   KANZI_FILES += kanzi-cpp/src/transform/BWTS.o
+   KANZI_FILES += kanzi-cpp/src/transform/UTFCodec.o
+   KANZI_FILES += kanzi-cpp/src/transform/ZRLT.o
+   KANZI_FILES += kanzi-cpp/src/transform/FSDCodec.o
+endif
 
 BRIEFLZ_FILES = brieflz/brieflz.o brieflz/depack.o brieflz/depacks.o
 
 LIBLZG_FILES = liblzg/decode.o liblzg/encode.o liblzg/checksum.o
 
-XZ_FILES = xz/lzma/lzma_decoder.o xz/lzma/lzma_encoder.o xz/lzma/lzma_encoder_optimum_fast.o xz/lzma/lzma_encoder_optimum_normal.o xz/lzma/fastpos_table.o
-XZ_FILES += xz/lzma/lzma_encoder_presets.o xz/lz/lz_decoder.o xz/lz/lz_encoder.o xz/lz/lz_encoder_mf.o xz/common/common.o xz/rangecoder/price_table.o
-XZ_FILES += xz/common/alone_encoder.o xz/common/alone_decoder.o xz/check/crc32_table.o xz/alone.o
+XZ_FILES = xz/src/liblzma/lzma/lzma_decoder.o xz/src/liblzma/lzma/lzma_encoder.o xz/src/liblzma/lzma/lzma_encoder_optimum_fast.o xz/src/liblzma/lzma/lzma_encoder_optimum_normal.o xz/src/liblzma/lzma/fastpos_table.o
+XZ_FILES += xz/src/liblzma/lzma/lzma_encoder_presets.o xz/src/liblzma/lz/lz_decoder.o xz/src/liblzma/lz/lz_encoder.o xz/src/liblzma/lz/lz_encoder_mf.o xz/src/liblzma/common/common.o xz/src/liblzma/rangecoder/price_table.o
+XZ_FILES += xz/src/liblzma/common/alone_encoder.o xz/src/liblzma/common/alone_decoder.o xz/src/liblzma/check/crc32_table.o _lzbench/xz_codec.o
+XZ_FLAGS = $(addprefix -I$(SOURCE_PATH),. xz/src xz/src/common xz/src/liblzma/api xz/src/liblzma/common xz/src/liblzma/lzma xz/src/liblzma/lz xz/src/liblzma/check xz/src/liblzma/rangecoder)
 
 GIPFELI_FILES = gipfeli/decompress.o gipfeli/entropy.o gipfeli/entropy_code_builder.o gipfeli/gipfeli-internal.o gipfeli/lz77.o
 
-LIBDEFLATE_FILES = libdeflate/lib/adler32.o libdeflate/lib/utils.o libdeflate/lib/crc32.o libdeflate/lib/deflate_compress.o
-LIBDEFLATE_FILES += libdeflate/lib/deflate_decompress.o libdeflate/lib/gzip_compress.o libdeflate/lib/gzip_decompress.o
-LIBDEFLATE_FILES += libdeflate/lib/x86/cpu_features.o libdeflate/lib/arm/cpu_features.o libdeflate/lib/zlib_compress.o libdeflate/lib/zlib_decompress.o
-
-MISC_FILES = crush/crush.o shrinker/shrinker.o fastlz/fastlz.o pithy/pithy.o lzjb/lzjb2010.o wflz/wfLZ.o
-MISC_FILES += lzlib/lzlib.o blosclz/blosclz.o blosclz/fastcopy.o slz/slz.o
-
 LZBENCH_FILES = _lzbench/lzbench.o _lzbench/compressors.o _lzbench/csc_codec.o
+
+ifeq "$(DONT_BUILD_LIBDEFLATE)" "1"
+    DEFINES += -DBENCH_REMOVE_LIBDEFLATE
+else
+    LIBDEFLATE_FILES = libdeflate/lib/adler32.o libdeflate/lib/crc32.o libdeflate/lib/deflate_compress.o libdeflate/lib/deflate_decompress.o
+    LIBDEFLATE_FILES += libdeflate/lib/gzip_compress.o libdeflate/lib/gzip_decompress.o libdeflate/lib/utils.o libdeflate/lib/zlib_compress.o libdeflate/lib/zlib_decompress.o
+    LIBDEFLATE_FILES += libdeflate/lib/x86/cpu_features.o libdeflate/lib/arm/cpu_features.o
+endif
+
+ifeq "$(DONT_BUILD_TAMP)" "1"
+    DEFINES += -DBENCH_REMOVE_TAMP
+else
+	TAMP_FILES += tamp/common.o tamp/compressor.o tamp/decompressor.o
+endif
 
 ifeq "$(DONT_BUILD_BZIP2)" "1"
     DEFINES += -DBENCH_REMOVE_BZIP2
 else
     BZIP2_FILES += bzip2/blocksort.o bzip2/huffman.o bzip2/crctable.o bzip2/randtable.o bzip2/compress.o bzip2/decompress.o bzip2/bzlib.o
+endif
+
+ifeq "$(DONT_BUILD_PPMD)" "1"
+    DEFINES += -DBENCH_REMOVE_PPMD
+else
+    PPMD_FILES += lzma/Ppmd8.o lzma/Ppmd8Dec.o lzma/Ppmd8Enc.o
 endif
 
 ifeq "$(DONT_BUILD_SNAPPY)" "1"
@@ -272,15 +334,11 @@ else
     MISC_FILES += yappy/yappy.o
 endif
 
-detected_OS := $(shell uname)
 
 ifeq "$(DONT_BUILD_ZLING)" "1"
     DEFINES += -DBENCH_REMOVE_ZLING
 else
     ZLING_FILES = libzling/libzling.o libzling/libzling_huffman.o libzling/libzling_lz.o libzling/libzling_utils.o
-ifeq ($(detected_OS), Darwin)
-    CFLAGS += -std=c++14
-endif
 endif
 
 ifeq "$(BENCH_HAS_NAKAMICHI)" "1"
@@ -297,7 +355,7 @@ ifneq "$(LIBCUDART)" ""
     CUDA_COMPILER = nvcc
     CUDA_CC = $(CUDA_BASE)/bin/nvcc --compiler-bindir $(CXX)
     CUDA_ARCH = 50 60 70 80
-    CUDA_CFLAGS = -x cu -std=c++14 -O3 $(foreach ARCH, $(CUDA_ARCH), --generate-code=arch=compute_$(ARCH),code=[compute_$(ARCH),sm_$(ARCH)]) --expt-extended-lambda -forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets
+    CUDA_CXXFLAGS = -x cu -std=c++14 -O3 $(foreach ARCH, $(CUDA_ARCH), --generate-code=arch=compute_$(ARCH),code=[compute_$(ARCH),sm_$(ARCH)]) --expt-extended-lambda -forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets
 else
     $(info CUDA Toolkit not found at $(CUDA_BASE), CUDA support will be disabled.)
     $(info Run "make CUDA_BASE=..." to use a different path.)
@@ -305,14 +363,37 @@ else
     LIBCUDART =
 endif
 
+ifeq "$(DONT_BUILD_BSC)" "1"
+    DEFINES += -DBENCH_REMOVE_BSC
+else
+    BSC_CXXFLAGS = -DLIBBSC_SORT_TRANSFORM_SUPPORT
+    BSC_FILES  = libbsc/libbsc/adler32/adler32.o
+    BSC_FILES += libbsc/libbsc/bwt/bwt.o
+    BSC_FILES += libbsc/libbsc/coder/coder.o
+    BSC_FILES += libbsc/libbsc/coder/qlfc/qlfc.o
+    BSC_FILES += libbsc/libbsc/coder/qlfc/qlfc_model.o
+    BSC_FILES += libbsc/libbsc/filters/detectors.o
+    BSC_FILES += libbsc/libbsc/filters/preprocessing.o
+    BSC_FILES += libbsc/libbsc/libbsc/libbsc.o
+    BSC_FILES += libbsc/libbsc/lzp/lzp.o
+    BSC_FILES += libbsc/libbsc/platform/platform.o
+    BSC_FILES += libbsc/libbsc/st/st.o
+    MISC_FILES += libbsc/libbsc/bwt/libsais/libsais.o
+endif
+
 ifneq "$(LIBCUDART)" ""
 ifneq "$(DONT_BUILD_NVCOMP)" "1"
     DEFINES += -DBENCH_HAS_NVCOMP
-    NVCOMP_CPP_SRC = $(wildcard nvcomp/*.cpp)
+    NVCOMP_CPP_SRC = $(wildcard nvcomp/src/*.cpp nvcomp/src/lowlevel/*.cpp)
     NVCOMP_CPP_OBJ = $(NVCOMP_CPP_SRC:%=%.o)
-    NVCOMP_CU_SRC  = $(wildcard nvcomp/*.cu)
+    NVCOMP_CU_SRC  = $(wildcard nvcomp/src/*.cu nvcomp/src/lowlevel/*.cu)
     NVCOMP_CU_OBJ  = $(NVCOMP_CU_SRC:%=%.o)
     NVCOMP_FILES   = $(NVCOMP_CU_OBJ) $(NVCOMP_CPP_OBJ)
+endif
+
+ifneq "$(DONT_BUILD_BSC)" "1"
+    BSC_CXXFLAGS += -DLIBBSC_CUDA_SUPPORT
+    MISC_FILES += libbsc/libbsc/st/st_cu.o libbsc/libbsc/bwt/libcubwt/libcubwt.o
 endif
 endif
 
@@ -331,15 +412,15 @@ pithy/pithy.o: pithy/pithy.cpp
 
 _lzbench/compressors.o: %.o : %.cpp
 	@$(MKDIR) $(dir $@)
-	$(CXX) $(CFLAGS) -std=c++11 $< -c -o $@
+	$(CXX) $(CXXFLAGS) -std=c++11 $< -c -o $@
 
 snappy/snappy-sinksource.o snappy/snappy-stubs-internal.o snappy/snappy.o: %.o : %.cc
 	@$(MKDIR) $(dir $@)
-	$(CXX) $(CFLAGS) -std=c++11 $< -c -o $@
+	$(CXX) $(CXXFLAGS) -std=c++11 $< -c -o $@
 
 lzsse/lzsse2/lzsse2.o lzsse/lzsse4/lzsse4.o lzsse/lzsse8/lzsse8.o: %.o : %.cpp
 	@$(MKDIR) $(dir $@)
-	$(CXX) $(CFLAGS) -std=c++0x -msse4.1 $< -c -o $@
+	$(CXX) $(CXXFLAGS) -std=c++0x -msse4.1 $< -c -o $@
 
 nakamichi/Nakamichi_Okamigan.o: nakamichi/Nakamichi_Okamigan.c
 	@$(MKDIR) $(dir $@)
@@ -347,11 +428,19 @@ nakamichi/Nakamichi_Okamigan.o: nakamichi/Nakamichi_Okamigan.c
 
 $(NVCOMP_CU_OBJ): %.cu.o: %.cu
 	@$(MKDIR) $(dir $@)
-	$(CUDA_CC) $(CUDA_CFLAGS) $(CFLAGS) -c $< -o $@
+	$(CUDA_CC) $(CUDA_CXXFLAGS) $(CXXFLAGS) -Invcomp/include -Invcomp/src -Invcomp/src/lowlevel -c $< -o $@
 
 $(NVCOMP_CPP_OBJ): %.cpp.o: %.cpp
 	@$(MKDIR) $(dir $@)
-	$(CXX) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -Invcomp/include -Invcomp/src -Invcomp/src/lowlevel -c $< -o $@
+
+libbsc/libbsc/st/st_cu.o: libbsc/libbsc/st/st.cu
+	@$(MKDIR) $(dir $@)
+	$(CUDA_CC) $(CUDA_CXXFLAGS) $(CXXFLAGS) $(BSC_CXXFLAGS) -c $< -o $@
+
+libbsc/libbsc/bwt/libcubwt/libcubwt.o: libbsc/libbsc/bwt/libcubwt/libcubwt.cu
+	@$(MKDIR) $(dir $@)
+	$(CUDA_CC) $(CUDA_CXXFLAGS) $(CXXFLAGS) $(BSC_CXXFLAGS) -c $< -o $@
 
 # disable the implicit rule for making a binary out of a single object file
 %: %.o
@@ -359,9 +448,33 @@ $(NVCOMP_CPP_OBJ): %.cpp.o: %.cpp
 
 _lzbench/lzbench.o: _lzbench/lzbench.cpp _lzbench/lzbench.h
 
-lzbench: $(BZIP2_FILES) $(DENSITY_FILES) $(FASTLZMA2_OBJ) $(ZSTD_FILES) $(GLZA_FILES) $(LZSSE_FILES) $(LZFSE_FILES) $(XPACK_FILES) $(GIPFELI_FILES) $(XZ_FILES) $(LIBLZG_FILES) $(BRIEFLZ_FILES) $(LZF_FILES) $(LZRW_FILES) $(BROTLI_FILES) $(CSC_FILES) $(LZMA_FILES) $(ZLING_FILES) $(QUICKLZ_FILES) $(SNAPPY_FILES) $(ZLIB_FILES) $(LZHAM_FILES) $(LZO_FILES) $(UCL_FILES) $(LZMAT_FILES) $(LZ4_FILES) $(LIBDEFLATE_FILES) $(MISC_FILES) $(NVCOMP_FILES) $(LZBENCH_FILES)
+lzbench: $(BSC_FILES) $(BZIP2_FILES) $(KANZI_FILES) $(DENSITY_FILES) $(FASTLZMA2_OBJ) $(ZSTD_FILES) $(GLZA_FILES) $(LZSSE_FILES) $(LZFSE_FILES) $(XPACK_FILES) $(GIPFELI_FILES) $(XZ_FILES) $(LIBLZG_FILES) $(BRIEFLZ_FILES) $(LZF_FILES) $(LZRW_FILES) $(BROTLI_FILES) $(CSC_FILES) $(LZMA_FILES) $(ZLING_FILES) $(QUICKLZ_FILES) $(SNAPPY_FILES) $(ZLIB_FILES) $(LZHAM_FILES) $(LZO_FILES) $(UCL_FILES) $(LZMAT_FILES) $(LZ4_FILES) $(LIZARD_FILES) $(LIBDEFLATE_FILES) $(TAMP_FILES) $(MISC_FILES) $(NVCOMP_FILES) $(LZBENCH_FILES) $(PPMD_FILES)
 	$(CXX) $^ -o $@ $(LDFLAGS)
 	@echo Linked GCC_VERSION=$(GCC_VERSION) CLANG_VERSION=$(CLANG_VERSION) COMPILER=$(COMPILER)
+
+$(LIZARD_FILES): %.o : %.c
+	@$(MKDIR) $(dir $@)
+	$(CC) $(CFLAGS_O2) $< -c -o $@
+
+$(XZ_FILES): %.o : %.c
+	@$(MKDIR) $(dir $@)
+	$(CC) $(CFLAGS) $(XZ_FLAGS) -DHAVE_CONFIG_H $< -c -o $@
+
+$(FASTLZMA2_OBJ): %.o : %.c
+	@$(MKDIR) $(dir $@)
+	$(CC) $(CFLAGS) -DFL2_SINGLETHREAD -DNO_XXHASH $< -c -o $@
+
+$(ZLIB_FILES): %.o : %.c
+	@$(MKDIR) $(dir $@)
+	$(CC) $(CFLAGS) -DZ_HAVE_UNISTD_H $< -c -o $@
+
+$(ZSTD_FILES): %.o : %.c
+	@$(MKDIR) $(dir $@)
+	$(CC) $(CFLAGS) -Izstd/lib -Izstd/lib/common $< -c -o $@
+
+$(BSC_FILES): %.o : %.cpp
+	@$(MKDIR) $(dir $@)
+	$(CC) $(CXXFLAGS) $(BSC_CXXFLAGS) $< -c -o $@
 
 .c.o:
 	@$(MKDIR) $(dir $@)
@@ -369,11 +482,12 @@ lzbench: $(BZIP2_FILES) $(DENSITY_FILES) $(FASTLZMA2_OBJ) $(ZSTD_FILES) $(GLZA_F
 
 .cc.o:
 	@$(MKDIR) $(dir $@)
-	$(CXX) $(CFLAGS) $< -c -o $@
+	$(CXX) $(CXXFLAGS) $< -c -o $@
 
 .cpp.o:
 	@$(MKDIR) $(dir $@)
-	$(CXX) $(CFLAGS) $< -c -o $@
+	$(CXX) $(CXXFLAGS) $< -c -o $@
 
 clean:
-	rm -rf lzbench lzbench.exe *.o _lzbench/*.o bzip2/*.o fast-lzma2/*.o slz/*.o zstd/lib/*.o zstd/lib/*.a zstd/lib/common/*.o zstd/lib/compress/*.o zstd/lib/decompress/*.o zstd/lib/dictBuilder/*.o lzsse/lzsse2/*.o lzsse/lzsse4/*.o lzsse/lzsse8/*.o lzfse/*.o xpack/lib/*.o blosclz/*.o gipfeli/*.o xz/*.o xz/common/*.o xz/check/*.o xz/lzma/*.o xz/lz/*.o xz/rangecoder/*.o liblzg/*.o lzlib/*.o brieflz/*.o brotli/common/*.o brotli/enc/*.o brotli/dec/*.o libcsc/*.o wflz/*.o lzjb/*.o lzma/*.o density/buffers/*.o density/algorithms/*.o density/algorithms/cheetah/core/*.o density/algorithms/*.o density/algorithms/lion/forms/*.o density/algorithms/lion/core/*.o density/algorithms/chameleon/core/*.o density/*.o density/structure/*.o pithy/*.o glza/*.o libzling/*.o yappy/*.o shrinker/*.o fastlz/*.o ucl/*.o zlib/*.o lzham/*.o lzmat/*.o lz4/lib/*.o crush/*.o lzf/*.o lzrw/*.o lzo/*.o snappy/*.o quicklz/*.o tornado/*.o libdeflate/lib/*.o libdeflate/lib/x86/*.o libdeflate/lib/arm/*.o nakamichi/*.o nvcomp/*.o
+	rm -rf lzbench lzbench.exe
+	find . -type f -name "*.o" -exec rm -f {} +

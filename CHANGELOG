@@ -1,5 +1,22 @@
 v2.0
-- updated lz4 to 1.9.4 (thanks to @ChristianSchindler) and later to 1.10.0
+- added lizard 2.1
+- added LZAV 4.5 (thanks to @jibsen)
+- added libbsc v3.3.4 (thanks to @stefanrua)
+- added ppmd8 based on 7-zip 24.09 (thanks to @pps83)
+- added kanzi v2.3 (thanks to @flanglet)
+- added tamp v1.3.1 (thanks to @BrianPugh)
+- updated nvcomp to 2.2.0 (the last open source version)
+- updated slz to 1.2.1
+- updated snappy to 1.2.1
+- updated brotli to 1.1.0
+- updated blosclz to 2.5.1 (from c-blosc-1.21.6)
+- updated lzlib to 1.15
+- updated xz to v5.6.3
+- updated zlib to 1.3.1 (thanks to @tansy)
+- updated lzma to 24.09
+- updated libdeflate to v1.23 (thanks to @tansy)
+- updated zstd to 1.5.6
+- updated lz4 to 1.10.0 (thanks to @ChristianSchindler)
 
 v1.9 (Jan 17, 2025)
 - added cpuid to title screen (thanks to @tansy)
@@ -13,6 +30,7 @@ v1.9 (Jan 17, 2025)
 - updated snappy to 2020-07-11 (4dd277f) (thanks to @jinfeihan57)
 - updated libdeflate to v1.6 (thanks to @jinfeihan57) and later to v1.9 (thanks to @tansy)
 - updated Brotli to 1.0.9 (thanks to @data-man)
+- removed lizard 1.0
 - started to use Azure Pipelines for testing
 
 v1.8.1 (Sep 1, 2020)

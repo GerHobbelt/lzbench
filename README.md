@@ -9,12 +9,10 @@ The disadvantage is that it requires source code of each compressor (therefore S
 
 |Status   |
 |---------|
-| [![Build Status][AzurePipelinesMasterBadge]][AzurePipelinesLink] [![Build status][AppveyorMasterBadge]][AppveyorLink] |
+| [![Build Status][AzurePipelinesMasterBadge]][AzurePipelinesLink] |
 
 [AzurePipelinesMasterBadge]: https://dev.azure.com/inikep/lzbench/_apis/build/status%2Finikep.lzbench?branchName=master "gcc and clang tests"
 [AzurePipelinesLink]: https://dev.azure.com/inikep/lzbench/_build/latest?definitionId=10&branchName=master
-[AppveyorMasterBadge]: https://ci.appveyor.com/api/projects/status/u7kjj8ino4gww40v/branch/master?svg=true "mingw tests"
-[AppveyorLink]: https://ci.appveyor.com/project/inikep/lzbench
 
 Usage
 -------------------------
@@ -66,10 +64,10 @@ The default linking for Linux is dynamic and static for Windows. This can be cha
 To remove one of compressors you can add `-DBENCH_REMOVE_XXX` to `DEFINES` in Makefile (e.g. `DEFINES += -DBENCH_REMOVE_LZ4` to remove LZ4).
 You also have to remove corresponding `*.o` files (e.g. `lz4/lz4.o` and `lz4/lz4hc.o`).
 
-lzbench undergoes automated testing using Azure Pipelines and AppVeyor with the following compilers:
+lzbench undergoes automated testing using Azure Pipelines with the following compilers:
 - Ubuntu: gcc (versions 7.5 to 14.2) and clang (versions 6.0 to 19), gcc 14.2 (32-bit)
 - MacOS: Apple LLVM version 15.0.0
-- MinGW (Windows): gcc 5.3 (32-bit) and gcc 9.1 (64-bit)
+- Windows: mingw32-gcc 14.2.0 (32-bit) and mingw64-gcc 14.2.0 (64-bit)
 - Cross-compilation: gcc for ARM (32-bit and 64-bit) and PowerPC (32-bit and 64-bit)
 
 
@@ -79,9 +77,10 @@ Supported compressors
 no longer maintained.  For information about the security of the various compressors,
 see the [CompFuzz Results](https://github.com/nemequ/compfuzz/wiki/Results) page.
 
- - [blosclz 2.0.0](https://github.com/Blosc/c-blosc2)
+ - [blosclz 2.5.1 (from c-blosc-1.21.6)](https://github.com/Blosc/c-blosc)
  - [brieflz 1.3.0](https://github.com/jibsen/brieflz)
- - [brotli 1.0.9](https://github.com/google/brotli)
+ - [brotli 1.1.0](https://github.com/google/brotli)
+ - [bsc 3.3.4](https://github.com/IlyaGrebnov/libbsc)
  - [bzip2 1.0.8](http://www.bzip.org/downloads.html)
  - [crush 1.0](https://sourceforge.net/projects/crush/)
  - [csc 2016-10-13](https://github.com/fusiyuan2010/CSC) - WARNING: it can throw SEGFAULT compiled with Apple LLVM version 7.3.0 (clang-703.0.31)
@@ -90,36 +89,40 @@ see the [CompFuzz Results](https://github.com/nemequ/compfuzz/wiki/Results) page
  - [fast-lzma2 1.0.1](https://github.com/conor42/fast-lzma2)
  - [gipfeli 2016-07-13](https://github.com/google/gipfeli)
  - [glza 0.8](https://encode.su/threads/2427-GLZA)
- - [libdeflate v1.6](https://github.com/ebiggers/libdeflate)
- - [lizard v1.0 (formerly lz5)](https://github.com/inikep/lizard)
+ - [kanzi 2.3](https://github.com/flanglet/kanzi-cpp)
+ - [libdeflate v1.23](https://github.com/ebiggers/libdeflate)
+ - [lizard v2.1](https://github.com/inikep/lizard)
  - [lz4/lz4hc v1.10.0](https://github.com/lz4/lz4)
+ - [lzav 4.5](https://github.com/avaneev/lzav)
  - [lzf 3.6](http://software.schmorp.de/pkg/liblzf.html)
  - [lzfse/lzvn 1.0](https://github.com/lzfse/lzfse)
  - [lzg 1.0.10](https://liblzg.bitsnbites.eu/)
  - [lzham 1.0](https://github.com/richgel999/lzham_codec)
  lzjb 2010
- - [lzlib 1.13](http://www.nongnu.org/lzip)
- - [lzma v19.00](http://7-zip.org)
+ - [lzlib 1.15](http://www.nongnu.org/lzip)
+ - [lzma v24.09](http://7-zip.org)
  - [lzmat 1.01 v1.0](https://github.com/nemequ/lzmat) - WARNING: it contains bugs (decompression error; returns 0); it can throw SEGFAULT compiled with gcc 4.9+ -O3
  - [lzo 2.10](http://www.oberhumer.com/opensource/lzo)
  - [lzrw 15-Jul-1991](https://en.wikipedia.org/wiki/LZRW)
  - [lzsse 2019-04-18 (1847c3e827)](https://github.com/ConorStokes/LZSSE)
  - [pithy 2011-12-24](https://github.com/johnezang/pithy) - WARNING: it contains bugs (decompression error; returns 0)
+ - [ppmd8 24.09](https://github.com/pps83/libppmd)
  - [quicklz 1.5.0](http://www.quicklz.com)
  - [shrinker 0.1](https://code.google.com/p/data-shrinker) - WARNING: it can throw SEGFAULT compiled with gcc 4.9+ -O3
- - [slz 1.2.0](http://www.libslz.org/) - only a compressor, uses zlib for decompression
- - [snappy 1.1.10](https://github.com/google/snappy)
+ - [slz 1.2.1](http://www.libslz.org/) - only a compressor, uses zlib for decompression
+ - [snappy 1.2.1](https://github.com/google/snappy)
+ - [tamp 1.3.1](https://github.com/BrianPugh/tamp)
  - [tornado 0.6a](http://freearc.org)
  - [ucl 1.03](http://www.oberhumer.com/opensource/ucl/)
  - [wflz 2015-09-16](https://github.com/ShaneWF/wflz) - WARNING: it can throw SEGFAULT compiled with gcc 4.9+ -O3
  - [xpack 2016-06-02](https://github.com/ebiggers/xpack)
- - [xz 5.2.4](https://tukaani.org/xz/)
+ - [xz 5.6.3](https://github.com/tukaani-project/xz)
  - [yalz77 2015-09-19](https://github.com/ivan-tkatchev/yalz77) - WARNING: A SEGFAULT was encountered with gcc 13.3.0 on the 32-bit ARM (arm-linux-gnueabi) target
  - [yappy 2014-03-22](https://encode.su/threads/2825-Yappy-(working)-compressor) - WARNING: A SEGFAULT was encountered with gcc 13.3.0 on the 32-bit ARM (arm-linux-gnueabi)
- - [zlib 1.2.11](http://zlib.net)
+ - [zlib 1.3.1](http://zlib.net)
  - [zling 2018-10-12](https://github.com/richox/libzling) - according to the author using libzling in a production environment is not a good idea
- - [zstd 1.5.5](https://github.com/facebook/zstd)
- - [nvcomp 1.2.3](https://github.com/NVIDIA/nvcomp) - If CUDA is available.
+ - [zstd 1.5.6](https://github.com/facebook/zstd)
+ - [nvcomp 2.2.0](https://github.com/NVIDIA/nvcomp) - If CUDA is available.
 
 
 CUDA support
@@ -127,7 +130,7 @@ CUDA support
 
 If CUDA is available, lzbench supports additional compressors:
   - [cudaMemcpy](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__MEMORY.html#group__CUDART__MEMORY_1gc263dbe6574220cc776b45438fc351e8) - similar to the reference `memcpy` benchmark, using GPU memory
-  - [nvcomp 1.2.2](https://github.com/NVIDIA/nvcomp) LZ4 GPU-only compressor
+  - [nvcomp 2.2.0](https://github.com/NVIDIA/nvcomp) LZ4 GPU-only compressor
 
 The directory where the CUDA compiler and libraries are available can be passed to `make` via the `CUDA_BASE` variable, *e.g.*:
 ```
