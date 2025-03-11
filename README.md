@@ -57,6 +57,7 @@ Supported compressors
  - [brotli 1.1.0](https://github.com/google/brotli)
  - [bsc 3.3.5](https://github.com/IlyaGrebnov/libbsc)
  - [bzip2 1.0.8](http://www.bzip.org/downloads.html)
+ - [bzip3 1.5.1](https://github.com/kspalaiologos/bzip3)
  - [crush 1.0](https://sourceforge.net/projects/crush/)
  - [fastlz 0.5.0](https://github.com/ariya/FastLZ)
  - [fast-lzma2 1.0.1](https://github.com/conor42/fast-lzma2)
@@ -88,7 +89,7 @@ Supported compressors
  - [zlib 1.3.1](http://zlib.net)
  - [zlib-ng 2.2.3](https://github.com/zlib-ng/zlib-ng)
  - [zling 2018-10-12](https://github.com/richox/libzling) - according to the author using libzling in a production environment is not a good idea
- - [zstd 1.5.6](https://github.com/facebook/zstd)
+ - [zstd 1.5.7](https://github.com/facebook/zstd)
 
 **Warning**: The compressors listed below have security issues and/or are
 no longer maintained. For information about the security of the various compressors,
