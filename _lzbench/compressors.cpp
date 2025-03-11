@@ -1,3 +1,12 @@
+/*
+ * Copyright (c) Przemyslaw Skibinski <inikep@gmail.com>
+ * All rights reserved.
+ *
+ * This source code is dual-licensed under the GPLv2 and GPLv3 licenses.
+ * For additional details, refer to the LICENSE file located in the root
+ * directory of this source tree.
+ */
+
 #include "compressors.h"
 #include <stdio.h>
 #include <stdint.h>
@@ -290,8 +299,8 @@ int64_t lzbench_libdeflate_decompress(char *inbuf, size_t insize, char *outbuf, 
 
 
 #ifndef BENCH_REMOVE_LZ4
-#include "lz4/lz4.h"
-#include "lz4/lz4hc.h"
+#include "lz4/lib/lz4.h"
+#include "lz4/lib/lz4hc.h"
 
 int64_t lzbench_lz4_compress(char *inbuf, size_t insize, char *outbuf, size_t outsize, size_t level, size_t, char*)
 {

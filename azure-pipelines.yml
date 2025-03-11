@@ -1,3 +1,19 @@
+pr:
+  branches:
+    include:
+    - '*'
+  paths:
+    exclude:
+    - doc
+
+trigger:
+  branches:
+    include:
+    - '*'
+  paths:
+    exclude:
+    - doc
+
 jobs:
 - job:
   timeoutInMinutes: 240
@@ -133,26 +149,18 @@ jobs:
 
 
       # gcc-7 and newer compilers
-      gcc-14 [Ubuntu 24.04 Noble]:
+      gcc-14 x86 64-bit [Ubuntu 24.04 Noble]:
         imageName: 'ubuntu-24.04'
         SELECTED_CC: gcc-14
         SELECTED_CXX: g++-14
         PACKAGES: 'g++-14'
 
-      gcc-14 BUILD_ARCH=32-bit [Ubuntu 24.04 Noble]:
+      gcc-14 x86 32-bit [Ubuntu 24.04 Noble]:
         imageName: 'ubuntu-24.04'
         SELECTED_CC: gcc-14
         SELECTED_CXX: g++-14
         PACKAGES: 'g++-14 g++-14-multilib gcc-multilib'
         MORE_OPTIONS: 'BUILD_ARCH=32-bit'
-
-      gcc-14 AArch64 [Ubuntu 24.04 Noble]:
-        imageName: 'ubuntu-24.04'
-        SELECTED_CC: aarch64-linux-gnu-gcc
-        SELECTED_CXX: aarch64-linux-gnu-g++
-        PACKAGES: 'qemu-system-arm qemu-user-static gcc-aarch64-linux-gnu g++-aarch64-linux-gnu'
-        MORE_OPTIONS: 'BUILD_STATIC=1'
-        QEMU_INTERPRETER: 'qemu-aarch64-static -L /usr/aarch64-linux-gnu'
 
       gcc-13 [Ubuntu 22.04 Jammy]:
         imageName: 'ubuntu-22.04'
@@ -195,6 +203,38 @@ jobs:
         SELECTED_CC: gcc-7
         SELECTED_CXX: g++-7
         PACKAGES: 'g++-7'
+
+      gcc ARM 64-bit [Ubuntu 24.04 Noble]:
+        imageName: 'ubuntu-24.04'
+        SELECTED_CC: aarch64-linux-gnu-gcc
+        SELECTED_CXX: aarch64-linux-gnu-g++
+        PACKAGES: 'qemu-system-arm qemu-user-static gcc-aarch64-linux-gnu g++-aarch64-linux-gnu'
+        MORE_OPTIONS: 'BUILD_STATIC=1'
+        QEMU_INTERPRETER: 'qemu-aarch64-static -L /usr/aarch64-linux-gnu'
+
+      gcc ARM 32-bit [Ubuntu 24.04 Noble]:
+        imageName: 'ubuntu-24.04'
+        SELECTED_CC: arm-linux-gnueabi-gcc
+        SELECTED_CXX: arm-linux-gnueabi-g++
+        PACKAGES: 'qemu-system-arm qemu-user-static gcc-arm-linux-gnueabi g++-arm-linux-gnueabi'
+        MORE_OPTIONS: 'BUILD_STATIC=1'
+        QEMU_INTERPRETER: 'qemu-arm-static -L /usr/arm-linux-gnueabi'
+
+      gcc PowerPC 64-bit [Ubuntu 24.04 Noble]:
+        imageName: 'ubuntu-24.04'
+        SELECTED_CC: powerpc64-linux-gnu-gcc
+        SELECTED_CXX: powerpc64-linux-gnu-g++
+        PACKAGES: 'qemu-system-ppc64 qemu-user-static gcc-powerpc64-linux-gnu g++-powerpc64-linux-gnu'
+        MORE_OPTIONS: 'BUILD_STATIC=1 DONT_BUILD_YAPPY=1 DONT_BUILD_DENSITY=1 DONT_BUILD_ZLING=1'
+        QEMU_INTERPRETER: 'qemu-ppc64-static -L /usr/powerpc64-linux-gnu'
+
+      gcc PowerPC 32-bit [Ubuntu 24.04 Noble]:
+        imageName: 'ubuntu-24.04'
+        SELECTED_CC: powerpc-linux-gnu-gcc
+        SELECTED_CXX: powerpc-linux-gnu-g++
+        PACKAGES: 'qemu-system-ppc qemu-user-static gcc-powerpc-linux-gnu g++-powerpc-linux-gnu'
+        MORE_OPTIONS: 'BUILD_STATIC=1 DONT_BUILD_YAPPY=1 DONT_BUILD_DENSITY=1 DONT_BUILD_ZLING=1'
+        QEMU_INTERPRETER: 'qemu-ppc-static -L /usr/powerpc-linux-gnu'
 
 
   steps:
@@ -278,8 +318,10 @@ jobs:
       df -Th
 
       make -j2 CC="ccache $SELECTED_CC" CXX="ccache $SELECTED_CXX" $MORE_OPTIONS || exit 1
-      file ./lzbench
       ccache --show-stats
+      echo -------------------------------------
+      file ./lzbench
+      $QEMU_INTERPRETER ./lzbench
 
       df -Th
       BUILD_TIME=$SECONDS
@@ -290,8 +332,7 @@ jobs:
     displayName: '*** Build'
 
   - script: |
-      $QEMU_INTERPRETER ./lzbench
-      $QEMU_INTERPRETER ./lzbench -eall ./lzbench
+      $QEMU_INTERPRETER ./lzbench -eall ./lzbench || exit 1
 
       RUN_TIME=$SECONDS
       echo --- Total time $(($RUN_TIME + $UPDATE_TIME + $BUILD_TIME)) seconds. Run time $RUN_TIME seconds. Build took $BUILD_TIME seconds. Packages updated in $UPDATE_TIME seconds.
@@ -300,3 +341,50 @@ jobs:
       df -Th
 
     displayName: '*** Run'
+
+
+- job:
+  pool:
+    vmImage: 'windows-latest'
+
+  strategy:
+    matrix:
+      mingw32-gcc x86 32-bit [Windows]:
+        toolchain: 'mingw32'
+        arch: '32-bit'
+        SELECTED_CC: gcc
+        SELECTED_CXX: g++
+        MORE_OPTIONS: 'DONT_BUILD_GLZA=1 DONT_BUILD_LZHAM=1'
+        ARCHIVE: https://github.com/niXman/mingw-builds-binaries/releases/download/14.2.0-rt_v12-rev1/i686-14.2.0-release-posix-dwarf-ucrt-rt_v12-rev1.7z
+      mingw64-gcc x86 64-bit [Windows]:
+        toolchain: 'mingw64'
+        arch: '64-bit'
+        SELECTED_CC: gcc
+        SELECTED_CXX: g++
+        MORE_OPTIONS: 'DONT_BUILD_LZHAM=1'
+        ARCHIVE: https://github.com/niXman/mingw-builds-binaries/releases/download/14.2.0-rt_v12-rev1/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev1.7z
+
+  steps:
+  - powershell: |
+      Invoke-WebRequest -Uri '$(ARCHIVE)' -OutFile '$(Build.ArtifactStagingDirectory)\mingw.7z'
+    displayName: 'Download MinGW'
+
+  - task: ExtractFiles@1
+    inputs:
+      archiveFilePatterns: '$(Build.ArtifactStagingDirectory)\mingw.7z'
+      destinationFolder: '$(Build.SourcesDirectory)\mingw'
+
+  - script: |
+      echo Building with $(toolchain) for $(arch) architecture
+      set PATH=$(Build.SourcesDirectory)\mingw\$(toolchain)\bin;%PATH%
+      where $(SELECTED_CC)
+      $(SELECTED_CXX) --version
+      mingw32-make -j2 CC=$(SELECTED_CC) CXX=$(SELECTED_CXX) $(MORE_OPTIONS) || exit 1
+      file lzbench.exe
+      lzbench.exe
+    displayName: 'Build with $(toolchain)'
+
+  - script: |
+      echo Running a build for $(toolchain) for $(arch) architecture
+      lzbench.exe -eall lzbench.exe || exit 1
+    displayName: 'Run for $(arch) architecture'
