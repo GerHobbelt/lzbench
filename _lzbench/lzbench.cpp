@@ -778,7 +778,7 @@ char* cpu_brand_string(void)
     else
         return NULL; // CPUID_EXTENDED unsupported by cpu
 
-    cpu_brand_str[3*sizeof(mx)+1] = '\0';
+    cpu_brand_str[3*sizeof(mx)] = '\0';
     return cpu_brand_str;
     #else
     return NULL;
@@ -796,7 +796,7 @@ int main( int argc, char** argv)
     const char** inFileNames = (const char**) calloc(argc, sizeof(char*));
     unsigned ifnIdx = 0;
     bool join = false;
-    char* cpu_brand;
+    char* cpu_brand = NULL;
 #ifdef UTIL_HAS_CREATEFILELIST
     const char** extendedFileList = NULL;
     char* fileNamesBuf = NULL;
