@@ -734,7 +734,7 @@ args_type parse_args(int argc, char ** argv) {
           args.chunk_size = size_t(std::stoull(*(argv++)));
           break;
         } else {
-          std::cerr << "INTERNAL ERROR: Unhandled paramter '" << arg << "'." << std::endl;
+          std::cerr << "INTERNAL ERROR: Unhandled parameter '" << arg << "'." << std::endl;
           usage(name, params);
           std::exit(1);
         }
