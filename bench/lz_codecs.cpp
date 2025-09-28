@@ -1192,7 +1192,7 @@ int64_t lzbench_ucl_nrv2e_decompress(char *inbuf, size_t insize, char *outbuf, s
 
 int64_t lzbench_zlib_compress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
 {
-    uLongf zcomplen = insize;
+    uLongf zcomplen = outsize;
     int err = compress2((uint8_t*)outbuf, &zcomplen, (uint8_t*)inbuf, insize, codec_options->level);
     if (err != Z_OK)
         return 0;
@@ -1217,11 +1217,13 @@ int64_t lzbench_zlib_decompress(char *inbuf, size_t insize, char *outbuf, size_t
 #undef z_const
 #undef Z_NULL
 
-#include "zlib-ng/zlib-ng.h"
+#define in_func zlibng_in_func
+#include "lz/zlib-ng/zlib-ng.h"
+#undef in_func
 
 int64_t lzbench_zlib_ng_compress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
 {
-    size_t zcomplen = insize;
+    size_t zcomplen = outsize;
     int err = zng_compress2((uint8_t*)outbuf, &zcomplen, (uint8_t*)inbuf, insize, codec_options->level);
     if (err != Z_OK)
         return 0;

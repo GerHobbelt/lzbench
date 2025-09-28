@@ -73,20 +73,20 @@ Supported compressors
  - [lzham 1.0](https://github.com/richgel999/lzham_codec)
  - lzjb 2010
  - [lzlib 1.15](http://www.nongnu.org/lzip)
- - [lzma v24.09](http://7-zip.org)
+ - [lzma v25.01](http://7-zip.org)
  - [lzo 2.10](http://www.oberhumer.com/opensource/lzo)
  - [lzsse 2019-04-18 (1847c3e827)](https://github.com/ConorStokes/LZSSE)
  - [nvcomp 2.2.0](https://github.com/NVIDIA/nvcomp) - if CUDA is available
- - [ppmd8 24.09](https://github.com/pps83/libppmd)
+ - [ppmd8 25.01](http://7-zip.org)
  - [quicklz 1.5.0](http://www.quicklz.com)
  - [slz 1.2.1](http://www.libslz.org/) - only a compressor, uses zlib for decompression
  - [snappy 1.2.2](https://github.com/google/snappy)
- - [tamp 1.3.1](https://github.com/BrianPugh/tamp)
+ - [tamp v1.10.0](https://github.com/BrianPugh/tamp)
  - [tornado 0.6a](http://freearc.org)
  - [ucl 1.03](http://www.oberhumer.com/opensource/ucl/)
  - [xz 5.8.1](https://github.com/tukaani-project/xz)
  - [zlib 1.3.1](http://zlib.net)
- - [zlib-ng 2.2.3](https://github.com/zlib-ng/zlib-ng)
+ - [zlib-ng 2.2.5](https://github.com/zlib-ng/zlib-ng)
  - [zling 2018-10-12](https://github.com/richox/libzling) - according to the author using libzling in a production environment is not a good idea
  - [zpaq 7.15](https://github.com/zpaq/zpaq)
  - [zstd 1.5.7](https://github.com/facebook/zstd)
