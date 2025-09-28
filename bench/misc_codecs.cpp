@@ -50,23 +50,6 @@ int64_t lzbench_lzjb_decompress(char *inbuf, size_t insize, char *outbuf, size_t
 
 
 
-#ifdef BENCH_HAS_NAKAMICHI
-#include "misc/nakamichi/nakamichi.h"
-
-int64_t lzbench_nakamichi_compress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
-{
-    return NakaCompress(outbuf, inbuf, insize);
-}
-
-int64_t lzbench_nakamichi_decompress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
-{
-    return NakaDecompress(outbuf, inbuf, insize);
-}
-
-#endif
-
-
-
 #ifndef BENCH_REMOVE_TAMP
 #include "lz/tamp/compressor.h"
 #include "lz/tamp/decompressor.h"
@@ -161,8 +144,8 @@ void lzbench_cuda_deinit(char* workmem)
 
 int64_t lzbench_cuda_memcpy(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
 {
-    cudaMemcpy(workmem, inbuf, insize, cudaMemcpyHostToDevice);
-    cudaMemcpy(outbuf, workmem, insize, cudaMemcpyDeviceToHost);
+    cudaMemcpy(codec_options->work_mem, inbuf, insize, cudaMemcpyHostToDevice);
+    cudaMemcpy(outbuf, codec_options->work_mem, insize, cudaMemcpyDeviceToHost);
     return insize;
 }
 
@@ -292,7 +275,7 @@ void lzbench_nvcomp_deinit(char* nvcomp_params)
 
 int64_t lzbench_nvcomp_compress(char *inbuf, size_t in_bytes, char *outbuf, size_t outsize, codec_options_t *codec_options)
 {
-    nvcomp_params_s* params = (nvcomp_params_s*) nvcomp_params;
+    nvcomp_params_s* params = (nvcomp_params_s*) codec_options->work_mem;
     int status = 0;
 
     // copy the uncompressed data to the device
@@ -339,7 +322,7 @@ int64_t lzbench_nvcomp_compress(char *inbuf, size_t in_bytes, char *outbuf, size
 
 int64_t lzbench_nvcomp_decompress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
 {
-    nvcomp_params_s* params = (nvcomp_params_s*) nvcomp_params;
+    nvcomp_params_s* params = (nvcomp_params_s*) codec_options->work_mem;
     int status = 0;
     size_t uncompressed_size = outsize;
 

@@ -16,6 +16,10 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <thread> // this_thread::yield
+
+
+int g_exit_result = 0; // global variable
 
 
 int istrcmp(const char *str1, const char *str2)
@@ -233,7 +237,7 @@ void print_stats(lzbench_params_t *params, const compressor_desc_t* desc, int le
     else
         format(col1_algname, "%s -%d", desc->name_version, level);
 
-    LZBENCH_PRINT(9, "ALL best_ctime=%lu best_dtime=%lu\n", (comp_error)?0:best_ctime, (decomp_error)?0:best_dtime);
+    LZBENCH_PRINT(9, "ALL best_ctime=%llu best_dtime=%llu\n", (uint64)((comp_error)?0:best_ctime), (uint64)((decomp_error)?0:best_dtime));
     params->results.push_back(string_table_t(col1_algname, (comp_error)?0:best_ctime, (decomp_error)?0:best_dtime, outsize, insize, params->in_filename));
     if (params->show_speed)
         print_speed(params, params->results[params->results.size()-1]);
@@ -290,8 +294,8 @@ inline int64_t lzbench_compress(lzbench_params_t *params, std::vector<size_t>& c
 
         if (clen <= 0)
         {
-            LZBENCH_PRINT(9, "ERROR: part=%lu clen=%ld in=%lu out=%lu\n", (uint64_t)part, clen, (uint64_t)(inbuf-start), (uint64_t)sum);
-            LZBENCH_PRINT(0, "ERROR: compression error in=%zu out=%ld/%zu (in_bytes=%lu out_bytes=%ld)\n", part, clen, outpart, (uint64_t)(inbuf+part-start), (int64_t)sum+clen);
+            LZBENCH_PRINT(9, "ERROR: part=%zu clen=%lld in=%llu out=%zu\n", part, (int64)clen, (uint64)(inbuf-start), sum);
+            LZBENCH_PRINT(0, "ERROR: compression error in=%zu out=%lld/%zu (in_bytes=%llu out_bytes=%llu)\n", part, (int64)clen, outpart, (uint64)(inbuf+part-start), (uint64)sum+clen);
             return 0;
         }
 
@@ -300,7 +304,7 @@ inline int64_t lzbench_compress(lzbench_params_t *params, std::vector<size_t>& c
         outsize -= clen;
         compr_sizes[i] = clen;
         sum += clen;
-        LZBENCH_PRINT(9, "ENC part=%lu clen=%ld in=%lu out=%lu\n", (uint64_t)part, clen, (uint64_t)(inbuf-start), (uint64_t)sum);
+        LZBENCH_PRINT(9, "ENC part=%zu clen=%llu in=%llu out=%llu\n", part, (uint64)clen, (uint64)(inbuf-start), (uint64)sum);
     }
     return sum;
 }
@@ -327,14 +331,14 @@ inline int64_t lzbench_decompress(lzbench_params_t *params, std::vector<size_t>&
         dlen = decompress((char*)inbuf, part, (char*)outbuf, chunk_sizes[i], codec_options);
 
         if (dlen <= 0) {
-            LZBENCH_PRINT(9, "DEC part=%lu dlen=%ld out=%lu\n", (uint64_t)part, dlen, (uint64_t)(outbuf - outstart));
+            LZBENCH_PRINT(9, "DEC part=%zu dlen=%lld out=%llu\n",part, (int64)dlen, (uint64)(outbuf - outstart));
             return dlen;
         }
 
         inbuf += part;
         outbuf += dlen;
         sum += dlen;
-        LZBENCH_PRINT(9, "DEC part=%lu dlen=%ld out=%lu\n", (uint64_t)part, dlen, (uint64_t)(outbuf - outstart));
+        LZBENCH_PRINT(9, "DEC part=%zu dlen=%lld out=%llu\n", part, (int64)dlen, (uint64)(outbuf - outstart));
     }
 
     return sum;
@@ -354,7 +358,7 @@ void lzbench_process_single_codec(lzbench_params_t *params, size_t max_chunk_siz
     char* workmem = NULL;
     int param2 = desc->additional_param;
 
-    LZBENCH_PRINT(5, "*** trying %s insize=%lu comprsize=%lu chunk_size=%lu\n", desc->name, (uint64_t)insize, (uint64_t)comprsize, (uint64_t)max_chunk_size);
+    LZBENCH_PRINT(5, "*** trying %s insize=%zu comprsize=%zu chunk_size=%zu\n", desc->name, insize, comprsize, max_chunk_size);
 
     if (!desc->compress || !desc->decompress) return;
     if (desc->init) workmem = desc->init(max_chunk_size, param1, param2);
@@ -371,7 +375,7 @@ void lzbench_process_single_codec(lzbench_params_t *params, size_t max_chunk_siz
         if (clen>0 && nanosec>=1000)
         {
             part = (part / nanosec); // speed in MB/s
-            if (part < params->cspeed) { LZBENCH_PRINT(7, "%s (100K) slower than %lu MB/s nanosec=%lu\n", desc->name, (uint64_t)part, (uint64_t)nanosec); goto done; }
+            if (part < params->cspeed) { LZBENCH_PRINT(7, "%s (100K) slower than %zu MB/s nanosec=%llu\n", desc->name, part, (uint64)nanosec); goto done; }
         }
     }
 
@@ -383,7 +387,7 @@ void lzbench_process_single_codec(lzbench_params_t *params, size_t max_chunk_siz
     do
     {
         i = 0;
-        uni_sleep(1); // give processor to other processes
+        std::this_thread::yield(); // give processor to other processes
         GetTime(loop_ticks);
         do
         {
@@ -406,11 +410,11 @@ void lzbench_process_single_codec(lzbench_params_t *params, size_t max_chunk_siz
         ctime.push_back(nanosec/i);
         speed = (float)insize*i*1000/nanosec;
 
-        if ((uint32_t)speed < params->cspeed) { LZBENCH_PRINT(7, "%s slower than %lu MB/s\n", desc->name, (uint64_t)speed); return; }
+        if ((uint32_t)speed < params->cspeed) { LZBENCH_PRINT(7, "%s slower than %llu MB/s\n", desc->name, (uint64)speed); return; }
 
         total_nanosec = GetDiffTime(rate, timer_ticks, end_ticks);
         total_c_iters += i;
-        LZBENCH_PRINT(8, "ENC %s nanosec=%lu iters=%d/%d\n", desc->name, (uint64_t)nanosec, total_c_iters, params->c_iters);
+        LZBENCH_PRINT(8, "ENC %s nanosec=%llu iters=%d/%d\n", desc->name, (uint64)nanosec, total_c_iters, params->c_iters);
         if ((total_c_iters >= params->c_iters) && (total_nanosec > ((uint64_t)params->cmintime*1000000))) break;
         LZBENCH_STDERR(2, "%s compr iter=%d time=%.2fs speed=%.2f MB/s     \r", desc->name, total_c_iters, total_nanosec/1000000000.0, speed);
     }
@@ -423,7 +427,7 @@ void lzbench_process_single_codec(lzbench_params_t *params, size_t max_chunk_siz
     do
     {
         i = 0;
-        uni_sleep(1); // give processor to other processes
+        std::this_thread::yield(); // give processor to other processes
         GetTime(loop_ticks);
         do
         {
@@ -442,7 +446,7 @@ void lzbench_process_single_codec(lzbench_params_t *params, size_t max_chunk_siz
         if (insize != decomplen)
         {
             decomp_error = true;
-            LZBENCH_PRINT(0, "ERROR in %s: decompressed size mismatch in_bytes[%ld] != out_bytes[%ld]\n", desc->name, (int64_t)insize, (int64_t)decomplen);
+            LZBENCH_PRINT(0, "ERROR in %s: decompressed size mismatch in_bytes[%zu] != out_bytes[%lld]\n", desc->name, insize, (int64)decomplen);
         }
 
         if (memcmp(inbuf, decomp, insize) != 0)
@@ -450,7 +454,7 @@ void lzbench_process_single_codec(lzbench_params_t *params, size_t max_chunk_siz
             decomp_error = true;
 
             size_t cmn = common(inbuf, decomp);
-            LZBENCH_PRINT(0, "ERROR in %s: decompressed bytes common=%ld/%ld\n", desc->name, (int64_t)cmn, (int64_t)insize);
+            LZBENCH_PRINT(0, "ERROR in %s: decompressed bytes common=%zu/%zu\n", desc->name, cmn, insize);
 
             if (params->verbose >= 10)
             {
@@ -459,7 +463,7 @@ void lzbench_process_single_codec(lzbench_params_t *params, size_t max_chunk_siz
                 cmn /= max_chunk_size;
                 size_t err_size = MIN(insize, (cmn+1)*max_chunk_size);
                 err_size -= cmn*max_chunk_size;
-                printf("ERROR: fwrite %lu-%lu to %s\n", (uint64_t)(cmn*max_chunk_size), (uint64_t)(cmn*max_chunk_size+err_size), text);
+                printf("ERROR: fwrite %llu-%llu to %s\n", (uint64)(cmn*max_chunk_size), (uint64)(cmn*max_chunk_size+err_size), text);
                 FILE *f = fopen(text, "wb");
                 if (f) fwrite(decomp+cmn*max_chunk_size, 1, err_size, f), fclose(f);
                 exit(1);
@@ -475,7 +479,7 @@ void lzbench_process_single_codec(lzbench_params_t *params, size_t max_chunk_siz
 
         total_nanosec = GetDiffTime(rate, timer_ticks, end_ticks);
         total_d_iters += i;
-        LZBENCH_PRINT(9, "DEC %s dnanosec=%lu iters=%d/%d\n", desc->name, (uint64_t)nanosec, i, params->d_iters);
+        LZBENCH_PRINT(9, "DEC %s dnanosec=%llu iters=%d/%d\n", desc->name, (uint64)nanosec, i, params->d_iters);
         if ((total_d_iters >= params->d_iters) && (total_nanosec > ((uint64_t)params->dmintime*1000000))) break;
         LZBENCH_STDERR(2, "%s decompr iter=%d time=%.2fs speed=%.2f MB/s     \r", desc->name, total_d_iters, total_nanosec/1000000000.0, (float)insize*i*1000/nanosec);
     }
@@ -495,7 +499,7 @@ void lzbench_process_codec_list(lzbench_params_t *params, size_t max_chunk_size,
 
     if (!namesWithParams) return;
 
-    LZBENCH_PRINT(5, "*** lzbench_process_codec_list insize=%lu comprsize=%lu\n", (uint64_t)insize, (uint64_t)comprsize);
+    LZBENCH_PRINT(5, "*** lzbench_process_codec_list insize=%zu comprsize=%zu\n", insize, comprsize);
 
     cnames = split(namesWithParams, '/');
 
@@ -640,7 +644,7 @@ int lzbench_join(lzbench_params_t* params, const char** inFileNames, unsigned if
     format(text, "%d files", (int)file_sizes.size());
     params->in_filename = text.c_str();
 
-    LZBENCH_PRINT(5, "totalsize=%lu inpos=%lu\n", (uint64_t)totalsize, (uint64_t)inpos);
+    LZBENCH_PRINT(5, "totalsize=%zu inpos=%zu\n", totalsize, inpos);
     totalsize = inpos;
 
     print_header(params);
@@ -683,6 +687,8 @@ int lzbench_main(lzbench_params_t* params, const char** inFileNames, unsigned if
         real_insize = ftello(in);
         rewind(in);
 
+        if (i == 0) print_header(params);
+
         if (params->mem_limit && real_insize > params->mem_limit)
             insize = params->mem_limit;
         else
@@ -709,8 +715,6 @@ int lzbench_main(lzbench_params_t* params, const char** inFileNames, unsigned if
         }
 
         insize = fread(inbuf, 1, insize, in);
-
-        if (i == 0) print_header(params);
 
         if (params->mem_limit && real_insize > params->mem_limit)
         {
@@ -746,7 +750,7 @@ void usage(lzbench_params_t* params)
 {
     fprintf(stdout, "lzbench - in-memory benchmark of open-source compressors\n\n");
     fprintf(stdout, "usage: " PROGNAME " [options] [input]\n\nwhere [input] is a file/s or a directory and [options] are:\n");
-    fprintf(stdout, "  -b#   set block/chunk size to # KB {default: filesize} (max %ld KB)\n", (uint64_t)(params->chunk_size>>10));
+    fprintf(stdout, "  -b#   set block/chunk size to # KB {default: filesize} (max %llu KB)\n", (uint64)(params->chunk_size>>10));
     fprintf(stdout, "  -c#   sort results by column # (1=algname, 2=ctime, 3=dtime, 4=comprsize)\n");
     fprintf(stdout, "  -e#   #=compressors separated by '/' with parameters specified after ',' {fast}\n");
     fprintf(stdout, "  -h    display this help and exit\n");
@@ -784,6 +788,23 @@ void show_version()
             "License GPL v2 or v3: GNU GPL version 2 or 3 <http://gnu.org/licenses/gpl.html>\n"
             "This is free software: you are free to change and redistribute it.\n"
             "There is NO WARRANTY, to the extent permitted by law.\n" );
+}
+
+#define xstr(s) str(s)
+#define str(s) #s
+
+static const char *get_compiler_information(void)
+{
+#if defined __clang__
+    return "Clang " xstr(__clang_major__) "." xstr(__clang_minor__) "." xstr(__clang_patchlevel__);
+#elif defined __GNUC__
+    //return "gcc " __VERSION__;
+    return "GCC " xstr(__GNUC__) "." xstr(__GNUC_MINOR__) "." xstr(__GNUC_PATCHLEVEL__);
+#elif defined _MSC_VER
+    return "MSVC " xstr(_MSC_VER);
+#else
+    return "unknown compiler";
+#endif
 }
 
 char* cpu_brand_string(void)
@@ -826,6 +847,7 @@ int main( int argc, char** argv)
     unsigned ifnIdx = 0;
     bool join = false;
     char* cpu_brand = NULL;
+    const char* compiler_info = NULL;
 #ifdef UTIL_HAS_CREATEFILELIST
     const char** extendedFileList = NULL;
     char* fileNamesBuf = NULL;
@@ -981,8 +1003,9 @@ int main( int argc, char** argv)
     }
 
     cpu_brand = cpu_brand_string();
-    LZBENCH_PRINT(2, PROGNAME " " PROGVERSION " (%d-bit " PROGOS ")  %s\n\n", (uint32_t)(8 * sizeof(uint8_t*)), cpu_brand ? cpu_brand : "");
-    LZBENCH_PRINT(5, "params: chunk_size=%lu c_iters=%d d_iters=%d cspeed=%d cmintime=%d dmintime=%d encoder_list=%s\n", (uint64_t)params->chunk_size, params->c_iters, params->d_iters, params->cspeed, params->cmintime, params->dmintime, encoder_list);
+    compiler_info = get_compiler_information();
+    LZBENCH_PRINT(2, PROGNAME " " PROGVERSION " | %s | %d-bit " PROGOS " | %s\n\n", compiler_info, (uint32_t)(8 * sizeof(uint8_t*)), cpu_brand ? cpu_brand : "");
+    LZBENCH_PRINT(5, "params: chunk_size=%llu c_iters=%d d_iters=%d cspeed=%d cmintime=%d dmintime=%d encoder_list=%s\n", (uint64)params->chunk_size, params->c_iters, params->d_iters, params->cspeed, params->cmintime, params->dmintime, encoder_list);
 
     if (ifnIdx < 1)  { usage(params); goto _clean; }
 
@@ -1014,9 +1037,9 @@ int main( int argc, char** argv)
         result = lzbench_main(params, inFileNames, ifnIdx, encoder_list);
 
     if (params->chunk_size > 10 * (1<<20)) {
-        LZBENCH_STDERR(2, "done... (cIters=%d dIters=%d cTime=%.1f dTime=%.1f chunkSize=%luMB cSpeed=%dMB)\n", params->c_iters, params->d_iters, params->cmintime/1000.0, params->dmintime/1000.0, (uint64_t)(params->chunk_size >> 20), params->cspeed);
+        LZBENCH_STDERR(2, "done... (cIters=%d dIters=%d cTime=%.1f dTime=%.1f chunkSize=%lluMB cSpeed=%dMB)\n", params->c_iters, params->d_iters, params->cmintime/1000.0, params->dmintime/1000.0, (uint64)(params->chunk_size >> 20), params->cspeed);
     } else {
-        LZBENCH_STDERR(2, "done... (cIters=%d dIters=%d cTime=%.1f dTime=%.1f chunkSize=%luKB cSpeed=%dMB)\n", params->c_iters, params->d_iters, params->cmintime/1000.0, params->dmintime/1000.0, (uint64_t)(params->chunk_size >> 10), params->cspeed);
+        LZBENCH_STDERR(2, "done... (cIters=%d dIters=%d cTime=%.1f dTime=%.1f chunkSize=%lluKB cSpeed=%dMB)\n", params->c_iters, params->d_iters, params->cmintime/1000.0, params->dmintime/1000.0, (uint64)(params->chunk_size >> 10), params->cspeed);
     }
 
     if (sort_col <= 0) goto _clean;

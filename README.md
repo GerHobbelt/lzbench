@@ -9,7 +9,7 @@ lzbench is an in-memory benchmarking tool for open-source compressors. It integr
 | [![Build Status][AzurePipelinesMasterBadge]][AzurePipelinesLink] |
 
 [AzurePipelinesMasterBadge]: https://dev.azure.com/inikep/lzbench/_apis/build/status%2Finikep.lzbench?branchName=master "gcc and clang tests"
-[AzurePipelinesLink]: https://dev.azure.com/inikep/lzbench/_build/latest?definitionId=12&branchName=master
+[AzurePipelinesLink]: https://dev.azure.com/inikep/lzbench/_build/latest?definitionId=17&branchName=master
 
 The list of changes in lzbench is available in the [CHANGELOG](CHANGELOG).
 
@@ -98,7 +98,6 @@ see the [CompFuzz Results](https://github.com/nemequ/compfuzz/wiki/Results) page
  - [gipfeli 2016-07-13](https://github.com/google/gipfeli): Contains bugs causing decompression file mismatch when compiled with GCC 14.2 using -O3.
  - [lzmat 1.01 v1.0](https://github.com/nemequ/lzmat): Contains decompression bugs and may cause a segmentation fault when compiled with GCC 4.9+ using -O3 optimization.
  - [lzrw 15-Jul-1991](https://en.wikipedia.org/wiki/LZRW): May trigger a segmentation fault when compiled with GCC 4.9+ using -O3.
- - [pithy 2011-12-24](https://github.com/johnezang/pithy): Contains decompression bugs (returns 0).
  - [wflz 2015-09-16](https://github.com/ShaneWF/wflz): May result in a segmentation fault when compiled with GCC 4.9+ using -O3.
  - [yalz77 2022-07-06](https://github.com/ivan-tkatchev/yalz77): A segmentation fault was encountered with GCC 13.3.0 on a 32-bit ARM (arm-linux-gnueabi) target.
  - [yappy 2014-03-22](https://encode.su/threads/2825-Yappy-(working)-compressor): A segmentation fault was observed with GCC 13.3.0 on a 32-bit ARM (arm-linux-gnueabi) system.

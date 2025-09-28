@@ -453,12 +453,6 @@ else
 endif
 
 
-ifeq "$(BENCH_HAS_NAKAMICHI)" "1"
-    DEFINES += -DBENCH_HAS_NAKAMICHI
-    MISC_FILES += misc/nakamichi/Nakamichi_Okamigan.o
-endif
-
-
 ifeq "$(DONT_BUILD_TAMP)" "1"
 	DEFINES += -DBENCH_REMOVE_TAMP
 else
@@ -507,13 +501,6 @@ ifeq "$(DONT_BUILD_LZRW)" "1"
     DEFINES += -DBENCH_REMOVE_LZRW
 else
     BUGGY_FILES += lz/lzrw/lzrw1-a.o lz/lzrw/lzrw1.o lz/lzrw/lzrw2.o lz/lzrw/lzrw3.o lz/lzrw/lzrw3-a.o
-endif
-
-
-ifeq "$(DONT_BUILD_PITHY)" "1"
-    DEFINES += -DBENCH_REMOVE_PITHY
-else
-    BUGGY_CXX_FILES += lz/pithy/pithy.o
 endif
 
 
@@ -679,10 +666,6 @@ $(BSC_CXX_FILES): %.o : %.cpp
 $(BSC_CUDA_FILES): %.cu.o: %.cu
 	@$(MKDIR) $(dir $@)
 	$(CUDA_CC) $(CUDA_CXXFLAGS) $(CXXFLAGS) $(BSC_FLAGS) -c $< -o $@
-
-nakamichi/Nakamichi_Okamigan.o: nakamichi/Nakamichi_Okamigan.c
-	@$(MKDIR) $(dir $@)
-	$(CC) $(CFLAGS) -mavx $< -c -o $@
 
 clean:
 	rm -rf lzbench lzbench.exe
