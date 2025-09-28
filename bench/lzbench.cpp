@@ -694,19 +694,24 @@ next_k:
 }
 
 
-void lzbench_process_mem_blocks(lzbench_params_t *params, std::vector<size_t> &file_sizes, const char *namesWithParams, uint8_t *inbuf, size_t insize, bench_rate_t rate)
+void lzbench_process_mem_blocks(lzbench_params_t *params, size_t max_chunk_size, std::vector<size_t> &file_sizes, const char *namesWithParams, uint8_t *inbuf, size_t insize, bench_rate_t rate)
 {
     uint8_t *compbuf, *decomp;
     size_t comprsize;
     std::vector<size_t> chunk_sizes;
-    size_t chunk_size = (params->chunk_size > insize) ? insize : params->chunk_size;
+
+    if (max_chunk_size > 0) {
+        max_chunk_size = (max_chunk_size > insize) ? insize : max_chunk_size;
+    } else {
+        max_chunk_size = insize;
+    }
 
     for (int i=0; i<file_sizes.size(); i++) {
         size_t tmpsize = file_sizes[i];
         while (tmpsize > 0)
         {
-            chunk_sizes.push_back(MIN(tmpsize, chunk_size));
-            tmpsize -= MIN(tmpsize, chunk_size);
+            chunk_sizes.push_back(MIN(tmpsize, max_chunk_size));
+            tmpsize -= MIN(tmpsize, max_chunk_size);
         }
     }
 
@@ -723,10 +728,10 @@ void lzbench_process_mem_blocks(lzbench_params_t *params, std::vector<size_t> &f
 
     LZBENCH_PRINT(5, "file_sizes=%zu chunk_sizes=%zu\n", file_sizes.size(), chunk_sizes.size());
 
-    int numThreads = lzbench_process_codec_list(params, chunk_size, chunk_sizes, namesWithParams, inbuf, insize, compbuf, comprsize, decomp, rate);
+    int numThreads = lzbench_process_codec_list(params, max_chunk_size, chunk_sizes, namesWithParams, inbuf, insize, compbuf, comprsize, decomp, rate);
 
     if (chunk_sizes.size() > 1 || numThreads > 1)
-        LZBENCH_PRINT(2, "[Summary] Files=%zu Chunks=%zu Threads=%d\n", file_sizes.size(), chunk_sizes.size(), numThreads);
+        LZBENCH_PRINT(2, "[Summary] Files=%zu Chunks=%zu ChunkSize=%zu Threads=%d\n", file_sizes.size(), chunk_sizes.size(), max_chunk_size, numThreads);
 
     free(compbuf);
     free(decomp);
@@ -793,7 +798,7 @@ int lzbench_join(lzbench_params_t* params, const char** inFileNames, unsigned if
     totalsize = inpos;
 
     print_header(params);
-    lzbench_process_mem_blocks(params, file_sizes, encoder_list?encoder_list:alias_desc[0].params, inbuf, totalsize, rate);
+    lzbench_process_mem_blocks(params, params->chunk_size, file_sizes, encoder_list?encoder_list:alias_desc[0].params, inbuf, totalsize, rate);
 
 _clean:
     free(inbuf);
@@ -841,28 +846,32 @@ int lzbench_main(lzbench_params_t* params, const char** inFileNames, unsigned if
 
         inbuf = (uint8_t*)alloc_and_touch(insize + PAD_SIZE, false);
 
-        if (!inbuf)
-        {
+        if (!inbuf) {
             printf("Not enough memory, please use -m option!");
             return 3;
         }
 
         if (params->random_read){
           unsigned long long pos = 0;
-          if (params->chunk_size < real_insize){
+          if (params->chunk_size > 0 && real_insize > params->chunk_size){
             pos = (rand() % (real_insize / params->chunk_size)) * params->chunk_size;
             insize = params->chunk_size;
             fseeko(in, pos, SEEK_SET);
           } else {
             insize = real_insize;
           }
-          printf("Seeking to: %llu %llu %llu\n", pos, (unsigned long long)params->chunk_size, (unsigned long long)insize);
+          printf("Seeking to: %llu, reading %llu bytes\n", pos, (unsigned long long)insize);
         }
 
         insize = fread(inbuf, 1, insize, in);
 
-        if (params->mem_limit && real_insize > params->mem_limit)
-        {
+        size_t max_chunk_size = params->chunk_size;
+        if (params->chunk_size == 0 && params->threads > 1) {
+            max_chunk_size = (insize + params->threads - 1) / params->threads;
+            LZBENCH_PRINT(5, "set max_chunk_size=%zu insize=%zu params->threads=%d\n", max_chunk_size, insize, params->threads);
+        }
+
+        if (params->mem_limit && real_insize > params->mem_limit) {
             int i;
             std::string partname;
             const char* filename = params->in_filename;
@@ -871,15 +880,13 @@ int lzbench_main(lzbench_params_t* params, const char** inFileNames, unsigned if
                 format(partname, "%s part %d", filename, i);
                 params->in_filename = partname.c_str();
                 file_sizes.push_back(insize);
-                lzbench_process_mem_blocks(params, file_sizes, encoder_list?encoder_list:alias_desc[0].params, inbuf, insize, rate);
+                lzbench_process_mem_blocks(params, max_chunk_size, file_sizes, encoder_list?encoder_list:alias_desc[0].params, inbuf, insize, rate);
                 file_sizes.clear();
                 insize = fread(inbuf, 1, insize, in);
             }
-        }
-        else
-        {
+        } else {
             file_sizes.push_back(insize);
-            lzbench_process_mem_blocks(params, file_sizes, encoder_list?encoder_list:alias_desc[0].params, inbuf, insize, rate);
+            lzbench_process_mem_blocks(params, max_chunk_size, file_sizes, encoder_list?encoder_list:alias_desc[0].params, inbuf, insize, rate);
             file_sizes.clear();
         }
 
@@ -895,7 +902,7 @@ void usage(lzbench_params_t* params)
 {
     fprintf(stdout, "lzbench - in-memory benchmark of open-source compressors\n\n");
     fprintf(stdout, "usage: " PROGNAME " [options] [input]\n\nwhere [input] is a file/s or a directory and [options] are:\n");
-    fprintf(stdout, "  -b#   set block/chunk size to # KB {default: filesize} (max %llu KB)\n", (uint64)(params->chunk_size>>10));
+    fprintf(stdout, "  -b#   set block/chunk size to # KB, 0=disabled {default: %llu}\n", (uint64)(params->chunk_size>>10));
     fprintf(stdout, "  -c#   sort results by column # (1=algname, 2=ctime, 3=dtime, 4=comprsize)\n");
     fprintf(stdout, "  -e#   #=compressors separated by '/' with parameters specified after ',' {fast}\n");
     fprintf(stdout, "  -h    display this help and exit\n");
@@ -1010,7 +1017,7 @@ int main( int argc, char** argv)
     params->textformat = TEXT;
     params->show_speed = 1;
     params->verbose = 2;
-    params->chunk_size = (1ULL << 31) - (1ULL << 31)/6;
+    params->chunk_size = 0;
     params->cspeed = 0;
     params->c_iters = params->d_iters = 1;
     params->cmintime = 10*DEFAULT_LOOP_TIME/1000000; // 1 sec
