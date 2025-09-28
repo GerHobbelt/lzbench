@@ -9,7 +9,7 @@ lzbench is an in-memory benchmarking tool for open-source compressors. It integr
 | [![Build Status][AzurePipelinesMasterBadge]][AzurePipelinesLink] |
 
 [AzurePipelinesMasterBadge]: https://dev.azure.com/inikep/lzbench/_apis/build/status%2Finikep.lzbench?branchName=master "gcc and clang tests"
-[AzurePipelinesLink]: https://dev.azure.com/inikep/lzbench/_build/latest?definitionId=17&branchName=master
+[AzurePipelinesLink]: https://dev.azure.com/inikep/lzbench/_build/latest?definitionId=19&branchName=master
 
 The list of changes in lzbench is available in the [CHANGELOG](CHANGELOG).
 
@@ -54,10 +54,11 @@ Supported compressors
 
  - [brieflz 1.3.0](https://github.com/jibsen/brieflz)
  - [brotli 1.1.0](https://github.com/google/brotli)
- - [bsc 3.3.9](https://github.com/IlyaGrebnov/libbsc)
+ - [bsc 3.3.11](https://github.com/IlyaGrebnov/libbsc)
  - [bzip2 1.0.8](http://www.bzip.org/downloads.html)
  - [bzip3 1.5.2](https://github.com/kspalaiologos/bzip3)
  - [crush 1.0](https://sourceforge.net/projects/crush/)
+ - [density 0.16.6](https://github.com/g1mv/density)
  - [fastlz 0.5.0](https://github.com/ariya/FastLZ)
  - [fast-lzma2 1.0.1](https://github.com/conor42/fast-lzma2)
  - [glza 0.8](https://encode.su/threads/2427-GLZA)
@@ -95,7 +96,6 @@ no longer maintained. For information about the security of the various compress
 see the [CompFuzz Results](https://github.com/nemequ/compfuzz/wiki/Results) page.
 
  - [csc 2016-10-13](https://github.com/fusiyuan2010/CSC): May cause a segmentation fault when compiled with Apple LLVM version 7.3.0 (clang-703.0.31).
- - [density 0.14.2](https://github.com/g1mv/density/tree/c_archive): Contains bugs leading to shortened decompressed output.
  - [gipfeli 2016-07-13](https://github.com/google/gipfeli): Contains bugs causing decompression file mismatch when compiled with GCC 14.2 using -O3.
  - [lzmat 1.01 v1.0](https://github.com/nemequ/lzmat): Contains decompression bugs and may cause a segmentation fault when compiled with GCC 4.9+ using -O3 optimization.
  - [lzrw 15-Jul-1991](https://en.wikipedia.org/wiki/LZRW): May trigger a segmentation fault when compiled with GCC 4.9+ using -O3.

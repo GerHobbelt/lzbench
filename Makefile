@@ -18,6 +18,7 @@
 
 # direct GNU Make to search the directories relative to the
 # parent directory of this file
+
 SOURCE_PATH=$(dir $(lastword $(MAKEFILE_LIST)))
 vpath
 vpath %.c $(SOURCE_PATH)
@@ -39,25 +40,29 @@ GCC_VERSION = $(shell echo | $(CC) -dM -E - | grep __VERSION__  | sed -e 's:\#de
 CLANG_VERSION = $(shell $(CC) -v 2>&1 | grep "clang version" | sed -e 's:.*version \([0-9.]*\).*:\1:' -e 's:\.\([0-9][0-9]\):\1:g' -e 's:\.\([0-9]\):0\1:g')
 
 # LZSSE requires compiler with __SSE4_1__ support and 64-bit CPU
-ifneq ($(shell echo|$(CC) -dM -E - -march=native|egrep -c '__(SSE4_1|x86_64)__'), 2)
+ifneq ($(shell echo|$(CC) -dM -E - -march=native 2>/dev/null|egrep -c '__(SSE4_1|x86_64)__'), 2)
     DONT_BUILD_LZSSE ?= 1
 endif
 
+# detect thread model for MinGW (posix or win32)
+THREAD_MODEL := $(shell $(CXX) --version | grep -iEo 'posix|win32')
+
 # detect Windows
 ifneq (,$(filter Windows%,$(OS)))
-    ifeq ($(COMPILER),clang)
-        DONT_BUILD_GLZA ?= 1
-    endif
+    THREAD_MODEL := $(or $(THREAD_MODEL),win32)
     BUILD_STATIC ?= 1
     ifeq ($(BUILD_STATIC),1)
         LDFLAGS += -lshell32 -lole32 -loleaut32 -static
     endif
 else
     ifeq ($(shell uname -p),powerpc)
-        # density and yappy don't work with big-endian PowerPC
-        DONT_BUILD_DENSITY ?= 1
+        # yappy doesn't work with big-endian PowerPC
         DONT_BUILD_YAPPY ?= 1
         DONT_BUILD_ZLING ?= 1
+    endif
+
+    ifneq (,$(filter riscv64 riscv32,$(shell uname -m)))
+        DONT_BUILD_TORNADO ?= 1
     endif
 
     # detect MacOS
@@ -67,11 +72,10 @@ else
         DONT_BUILD_CSC ?= 1
         DEFINES += -Dunix
     endif
-    ifeq ($(detected_OS), Linux)
+
+    ifneq ($(THREAD_MODEL), win32)
         DEFINES += -Dunix
     endif
-
-    LDFLAGS	+= -pthread
 
     ifeq ($(BUILD_STATIC),1)
         LDFLAGS	+= -static -static-libstdc++
@@ -100,7 +104,7 @@ endif
 CXXFLAGS  = $(CODE_FLAGS) $(OPT_FLAGS_O3) $(DEFINES) $(MOREFLAGS) $(USER_CXXFLAGS)
 CFLAGS    = $(CODE_FLAGS) $(OPT_FLAGS_O3) $(DEFINES) $(MOREFLAGS) $(USER_CFLAGS)
 CFLAGS_O2 = $(CODE_FLAGS) $(OPT_FLAGS_O2) $(DEFINES) $(MOREFLAGS) $(USER_CFLAGS)
-LDFLAGS  += $(MOREFLAGS) $(USER_LDFLAGS)
+LDFLAGS  += -pthread $(MOREFLAGS) $(USER_LDFLAGS)
 ifeq ($(detected_OS), Darwin)
     CXXFLAGS += -std=c++14
 endif
@@ -115,6 +119,42 @@ ifneq "$(DISABLE_THREADING)" "1"
 else
     DEFINES += -DDISABLE_THREADING
 endif
+
+
+# Density and Rust related detection
+HOST_ARCH   := $(shell uname -m)
+TARGET_ARCH := $(firstword $(subst -, ,$(shell $(CXX) -dumpmachine)))
+HAVE_CARGO  := $(shell command -v cargo >/dev/null 2>&1 && echo 1 || echo 0)
+
+ifeq ($(HAVE_CARGO),1)
+    CARGO_VERSION := $(shell cargo --version | awk '{print $$2}')
+    HAVE_EDITION_2024 := $(shell printf "%s\n1.82.0\n" "$(CARGO_VERSION)" | sort -V | head -n1 | grep -qx 1.82.0 && echo 1 || echo 0)
+endif
+
+ifneq ($(DONT_BUILD_DENSITY),1)
+    DENSITY_SRC_DIR=misc/density/src/
+    DONT_BUILD_DENSITY := 1
+
+    # Only build Density if native build, not 32-bit, not Windows
+    ifneq ($(HAVE_CARGO),1)
+        $(info Cargo not found – skipping Density build)
+    else ifneq ($(HAVE_EDITION_2024),1)
+        $(info Cargo $(CARGO_VERSION) does not support edition 2024 – skipping Density build)
+    else ifneq ($(HOST_ARCH),$(TARGET_ARCH)) # Skip cross-compilation
+    else ifeq ($(BUILD_ARCH),32-bit)         # Skip user requested 32-bit compilation
+    else ifneq (,$(filter Windows%,$(OS)))   # Skip Windows builds due to undefined reference errors on linking even when adding required native static libs to linking dependencies
+    else
+        ifeq ($(BUILD_STATIC),1)
+            DENSITY_BUILD_TYPE=staticlib
+        else
+            DENSITY_BUILD_TYPE=cdylib
+        endif
+
+        LDFLAGS += -Wl,-rpath,$(DENSITY_SRC_DIR)target/release -L$(DENSITY_SRC_DIR)target/release -ldensity_rs
+        DONT_BUILD_DENSITY := 0
+    endif
+endif
+
 
 
 ifeq "$(DONT_BUILD_BRIEFLZ)" "1"
@@ -486,13 +526,6 @@ endif
 
 ifeq "$(DONT_BUILD_DENSITY)" "1"
     DEFINES += -DBENCH_REMOVE_DENSITY
-else
-    BUGGY_FILES += lz/density/globals.o lz/density/buffers/buffer.o
-    BUGGY_FILES += lz/density/algorithms/cheetah/core/cheetah_decode.o lz/density/algorithms/cheetah/core/cheetah_encode.o
-    BUGGY_FILES += lz/density/algorithms/lion/forms/lion_form_model.o lz/density/algorithms/lion/core/lion_decode.o
-    BUGGY_FILES += lz/density/algorithms/lion/core/lion_encode.o lz/density/algorithms/dictionaries.o
-    BUGGY_FILES += lz/density/algorithms/chameleon/core/chameleon_decode.o lz/density/algorithms/chameleon/core/chameleon_encode.o
-    BUGGY_FILES += lz/density/algorithms/algorithms.o lz/density/structure/header.o
 endif
 
 
@@ -572,7 +605,7 @@ lzbench: $(BUGGY_FILES) $(BUGGY_CC_FILES) $(BUGGY_CXX_FILES) $(CSC_FILES) $(BSC_
 	$(CXX) $^ -o $@ $(LDFLAGS)
 	@echo Linked GCC_VERSION=$(GCC_VERSION) CLANG_VERSION=$(CLANG_VERSION) COMPILER=$(COMPILER)
 
-bench/lzbench.o: bench/lzbench.cpp bench/lzbench.h bench/threadpool.h bench/codecs.h
+bench/lzbench.o: bench/lzbench.cpp bench/lzbench.h bench/threadpool.h bench/codecs.h DENSITY_LIB
 
 # disable the implicit rule for making a binary out of a single object file
 %: %.o
@@ -684,6 +717,15 @@ $(BSC_CUDA_FILES): %.cu.o: %.cu
 	@$(MKDIR) $(dir $@)
 	$(CUDA_CC) $(CUDA_CXXFLAGS) $(CXXFLAGS) $(BSC_FLAGS) -c $< -o $@
 
+DENSITY_LIB:
+ifneq ($(DONT_BUILD_DENSITY),1)
+	@echo "Building Density..."
+	cd $(DENSITY_SRC_DIR) && \
+	RUSTFLAGS="-C target-cpu=native -C linker=$(lastword $(CXX))" \
+	cargo rustc --crate-type=$(DENSITY_BUILD_TYPE) --release -- --print=native-static-libs
+endif
+
 clean:
 	rm -rf lzbench lzbench.exe
 	find . -type f -name "*.o" -exec rm -f {} +
+	rm -rf $(DENSITY_SRC_DIR)target/
