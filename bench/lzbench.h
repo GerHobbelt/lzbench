@@ -95,9 +95,9 @@ typedef struct string_table
     std::string col1_algname;
     uint64_t col2_ctime, col3_dtime, col4_comprsize, col5_origsize;
     std::string col6_filename;
-    int usedCompThreads, usedDecompThreads;
-    string_table(std::string c1, uint64_t c2, uint64_t c3, uint64_t c4, uint64_t c5, std::string filename, int compThreads, int decompThreads) :
-        col1_algname(c1), col2_ctime(c2), col3_dtime(c3), col4_comprsize(c4), col5_origsize(c5), col6_filename(filename), usedCompThreads(compThreads), usedDecompThreads(decompThreads) {}
+    int usedCompThreads, usedDecompThreads, usedCodecThreads;
+    string_table(std::string c1, uint64_t c2, uint64_t c3, uint64_t c4, uint64_t c5, std::string filename, int compThreads, int decompThreads, int codecThreads) :
+        col1_algname(c1), col2_ctime(c2), col3_dtime(c3), col4_comprsize(c4), col5_origsize(c5), col6_filename(filename), usedCompThreads(compThreads), usedDecompThreads(decompThreads), usedCodecThreads(codecThreads) {}
 } string_table_t;
 
 enum textformat_e { MARKDOWN=1, TEXT, TEXT_FULL, CSV, TURBOBENCH, MARKDOWN2 };
@@ -105,7 +105,8 @@ enum timetype_e { FASTEST=1, AVERAGE, MEDIAN };
 
 typedef struct
 {
-    int show_speed, compress_only, threads;
+    int show_speed, compress_only;
+    int threads, codec_threads;
     timetype_e timetype;
     textformat_e textformat;
     size_t chunk_size;
@@ -183,7 +184,7 @@ static const compressor_desc_t comp_desc[] =
     { "fastlz",     "fastlz 0.5.0",            1,   2,    0,       0, lzbench_fastlz_compress,     lzbench_fastlz_decompress,     NULL,                    NULL },
     { "fastlzma2",  "fastlzma2 1.0.1",         1,  10,    0,       0, lzbench_fastlzma2_compress,  lzbench_fastlzma2_decompress,  NULL,                    NULL },
     { "gipfeli",    "gipfeli 2016-07-13",      0,   0,    0,       0, lzbench_gipfeli_compress,    lzbench_gipfeli_decompress,    NULL,                    NULL },
-    { "glza",       "glza 0.8",                0,   0,    0,       1, lzbench_glza_compress,       lzbench_glza_decompress,       NULL,                    NULL },
+    { "glza",       "glza 0.11.8",             0,   0,    0,       1, lzbench_glza_compress,       lzbench_glza_decompress,       NULL,                    NULL },
     { "kanzi",      "kanzi 2.4.0",             1,   9,    0,       0, lzbench_kanzi_compress,      lzbench_kanzi_decompress,      NULL,                    NULL },
     { "libdeflate", "libdeflate 1.24",         1,  12,    0,       0, lzbench_libdeflate_compress, lzbench_libdeflate_decompress, NULL,                    NULL },
     { "lizard",     "lizard 2.1",             10,  49,    0,       0, lzbench_lizard_compress,     lzbench_lizard_decompress,     NULL,                    NULL },

@@ -114,10 +114,11 @@ LZ_CODECS     = bench/lz_codecs.o
 BUGGY_CODECS  = bench/buggy_codecs.o
 LZBENCH_FILES = $(LZ_CODECS) $(BUGGY_CODECS) bench/lzbench.o bench/symmetric_codecs.o bench/misc_codecs.o
 
-ifneq "$(DISABLE_THREADING)" "1"
-    LZBENCH_FILES += bench/threadpool.o
-else
+ifeq "$(DISABLE_THREADING)" "1"
     DEFINES += -DDISABLE_THREADING
+    FASTLZMA2_FLAGS = -DFL2_SINGLETHREAD
+else
+    LZBENCH_FILES += bench/threadpool.o
 endif
 
 # Try compiling a small test with __builtin_ctz
@@ -299,7 +300,8 @@ ifeq "$(DONT_BUILD_LZMA)" "1"
     DEFINES += -DBENCH_REMOVE_LZMA
 else
     LZMA_FILES  = misc/7-zip/CpuArch.o misc/7-zip/LzFind.o misc/7-zip/LzFindOpt.o misc/7-zip/LzFindMt.o
-    LZMA_FILES += misc/7-zip/LzmaDec.o misc/7-zip/LzmaEnc.o misc/7-zip/Threads.o misc/7-zip/Alloc.o
+    LZMA_FILES += misc/7-zip/LzmaDec.o misc/7-zip/LzmaEnc.o misc/7-zip/Threads.o misc/7-zip/7zStream.o misc/7-zip/Alloc.o
+    LZMA_FILES += misc/7-zip/Lzma2Dec.o misc/7-zip/Lzma2DecMt.o misc/7-zip/Lzma2Enc.o misc/7-zip/MtCoder.o misc/7-zip/MtDec.o
 endif
 
 
@@ -660,7 +662,7 @@ $(CSC_FILES): %.o : %.cpp
 
 $(FASTLZMA2_OBJ): %.o : %.c
 	@$(MKDIR) $(dir $@)
-	$(CC) $(CFLAGS) -DFL2_SINGLETHREAD -DNO_XXHASH $< -c -o $@
+	$(CC) $(CFLAGS) $(FASTLZMA2_FLAGS) -DNO_XXHASH $< -c -o $@
 
 $(LIBDEFLATE_FILES): %.o : %.c
 	@$(MKDIR) $(dir $@)
