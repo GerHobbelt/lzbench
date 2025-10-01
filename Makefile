@@ -44,8 +44,9 @@ ifneq ($(shell echo|$(CC) -dM -E - -march=native 2>/dev/null|egrep -c '__(SSE4_1
     DONT_BUILD_LZSSE ?= 1
 endif
 
-# detect thread model for MinGW (posix or win32)
-THREAD_MODEL := $(shell $(CXX) --version | grep -iEo 'posix|win32')
+# detect thread model for gcc or clang
+THREAD_MODEL := $(shell $(CXX) -v 2>&1 | grep '^Thread model:' | awk '{print $$3}')
+$(info Detected thread model: $(THREAD_MODEL))
 
 # detect Windows
 ifneq (,$(filter Windows%,$(OS)))
@@ -55,6 +56,7 @@ ifneq (,$(filter Windows%,$(OS)))
         LDFLAGS += -lshell32 -lole32 -loleaut32 -static
     endif
 else
+    THREAD_MODEL := $(or $(THREAD_MODEL),posix)
     ifeq ($(shell uname -p),powerpc)
         # yappy doesn't work with big-endian PowerPC
         DONT_BUILD_YAPPY ?= 1
@@ -119,6 +121,7 @@ ifeq "$(DISABLE_THREADING)" "1"
     FASTLZMA2_FLAGS = -DFL2_SINGLETHREAD
 else
     LZBENCH_FILES += bench/threadpool.o
+    ZSTD_FLAGS = -DZSTD_MULTITHREAD
 endif
 
 # Try compiling a small test with __builtin_ctz
@@ -282,10 +285,21 @@ endif
 ifeq "$(DONT_BUILD_LZHAM)" "1"
     DEFINES += -DBENCH_REMOVE_LZHAM
 else
-    LZHAM_FILES  = lz/lzham/lzham_assert.o lz/lzham/lzham_checksum.o lz/lzham/lzham_huffman_codes.o lz/lzham/lzham_lzbase.o
-    LZHAM_FILES += lz/lzham/lzham_lzcomp.o lz/lzham/lzham_lzcomp_internal.o lz/lzham/lzham_lzdecomp.o lz/lzham/lzham_lzdecompbase.o
-    LZHAM_FILES += lz/lzham/lzham_match_accel.o lz/lzham/lzham_mem.o lz/lzham/lzham_platform.o lz/lzham/lzham_lzcomp_state.o
-    LZHAM_FILES += lz/lzham/lzham_prefix_coding.o lz/lzham/lzham_symbol_codec.o lz/lzham/lzham_timer.o lz/lzham/lzham_vector.o lz/lzham/lzham_lib.o
+    LZHAM_FILES  = lz/lzham/lzhamdecomp/lzham_assert.o lz/lzham/lzhamdecomp/lzham_checksum.o lz/lzham/lzhamdecomp/lzham_huffman_codes.o
+    LZHAM_FILES += lz/lzham/lzhamdecomp/lzham_lzdecomp.o lz/lzham/lzhamdecomp/lzham_lzdecompbase.o lz/lzham/lzhamdecomp/lzham_mem.o
+    LZHAM_FILES += lz/lzham/lzhamdecomp/lzham_platform.o lz/lzham/lzhamdecomp/lzham_prefix_coding.o lz/lzham/lzhamdecomp/lzham_timer.o
+    LZHAM_FILES += lz/lzham/lzhamdecomp/lzham_symbol_codec.o lz/lzham/lzhamdecomp/lzham_vector.o lz/lzham/lzhamlib/lzham_lib.o
+    LZHAM_FILES += lz/lzham/lzhamcomp/lzham_lzbase.o lz/lzham/lzhamcomp/lzham_lzcomp.o lz/lzham/lzhamcomp/lzham_lzcomp_internal.o
+    LZHAM_FILES += lz/lzham/lzhamcomp/lzham_lzcomp_state.o lz/lzham/lzhamcomp/lzham_match_accel.o
+
+    ifneq "$(DISABLE_THREADING)" "1"
+        ifeq ($(THREAD_MODEL), win32)
+            LZHAM_FILES += lz/lzham/lzhamcomp/lzham_win32_threading.o
+        else
+            LZHAM_FILES += lz/lzham/lzhamcomp/lzham_pthreads_threading.o
+            LZHAM_FLAGS = -DTHREAD_MODEL_POSIX
+        endif
+    endif
 endif
 
 
@@ -373,8 +387,18 @@ ifeq "$(DONT_BUILD_XZ)" "1"
 else
     XZ_FILES = lz/xz/src/liblzma/lzma/lzma_decoder.o lz/xz/src/liblzma/lzma/lzma_encoder.o lz/xz/src/liblzma/lzma/lzma_encoder_optimum_fast.o lz/xz/src/liblzma/lzma/lzma_encoder_optimum_normal.o lz/xz/src/liblzma/lzma/fastpos_table.o
     XZ_FILES += lz/xz/src/liblzma/lzma/lzma_encoder_presets.o lz/xz/src/liblzma/lz/lz_decoder.o lz/xz/src/liblzma/lz/lz_encoder.o lz/xz/src/liblzma/lz/lz_encoder_mf.o lz/xz/src/liblzma/common/common.o lz/xz/src/liblzma/rangecoder/price_table.o
-    XZ_FILES += lz/xz/src/liblzma/common/alone_encoder.o lz/xz/src/liblzma/common/alone_decoder.o lz/xz/src/liblzma/check/crc32_table.o
-    XZ_FLAGS = $(addprefix -I$(SOURCE_PATH),. lz/xz/src lz/xz/src/common lz/xz/src/liblzma/api lz/xz/src/liblzma/common lz/xz/src/liblzma/lzma lz/xz/src/liblzma/lz lz/xz/src/liblzma/check lz/xz/src/liblzma/rangecoder)
+    XZ_FILES += lz/xz/src/liblzma/common/block_decoder.o lz/xz/src/liblzma/common/block_util.o lz/xz/src/liblzma/common/outqueue.o
+    XZ_FILES += lz/xz/src/liblzma/common/stream_flags_common.o lz/xz/src/liblzma/common/index.o lz/xz/src/liblzma/check/check.o
+    XZ_FILES += lz/xz/src/liblzma/common/stream_encoder_mt.o lz/xz/src/liblzma/common/stream_decoder_mt.o
+    XZ_FILES += lz/xz/src/liblzma/common/filter_common.o lz/xz/src/liblzma/common/stream_flags_decoder.o
+    XZ_FILES += lz/xz/src/liblzma/common/stream_flags_encoder.o lz/xz/src/liblzma/common/block_buffer_encoder.o
+    XZ_FILES += lz/xz/src/liblzma/check/crc32_fast.o lz/xz/src/liblzma/common/block_header_encoder.o lz/xz/src/liblzma/common/vli_encoder.o
+    XZ_FILES += lz/xz/src/liblzma/common/vli_size.o lz/xz/src/liblzma/common/filter_flags_encoder.o lz/xz/src/liblzma/common/filter_encoder.o
+    XZ_FILES += lz/xz/src/liblzma/lzma/lzma2_encoder.o lz/xz/src/liblzma/common/easy_preset.o lz/xz/src/liblzma/common/block_encoder.o
+    XZ_FILES += lz/xz/src/liblzma/common/index_encoder.o lz/xz/src/liblzma/common/filter_decoder.o lz/xz/src/liblzma/lzma/lzma2_decoder.o
+    XZ_FILES += lz/xz/src/liblzma/common/block_header_decoder.o lz/xz/src/liblzma/common/vli_decoder.o lz/xz/src/liblzma/common/filter_flags_decoder.o
+    XZ_FILES += lz/xz/src/liblzma/common/index_hash.o
+    XZ_FLAGS = $(addprefix -I$(SOURCE_PATH),. lz/xz/src lz/xz/src/common lz/xz/src/liblzma/delta lz/xz/src/liblzma/simple lz/xz/src/liblzma/api lz/xz/src/liblzma/common lz/xz/src/liblzma/lzma lz/xz/src/liblzma/lz lz/xz/src/liblzma/check lz/xz/src/liblzma/rangecoder)
 endif
 
 
@@ -676,6 +700,10 @@ $(LZ_CODECS): %.o : %.cpp
 	@$(MKDIR) $(dir $@)
 	$(CXX) $(CXXFLAGS) -Ilz -Ilz/brotli/include $< -c -o $@
 
+$(LZHAM_FILES): %.o : %.cpp
+	@$(MKDIR) $(dir $@)
+	$(CXX) $(CFLAGS) $(LZHAM_FLAGS) -Ilz/lzham/include -Ilz/lzham/lzhamcomp -Ilz/lzham/lzhamdecomp $< -c -o $@
+
 $(LZO_FILES): %.o : %.c
 	@$(MKDIR) $(dir $@)
 	$(CC) $(CFLAGS) -Ilz $< -c -o $@
@@ -694,7 +722,7 @@ $(UCL_FILES): %.o : %.c
 
 $(XZ_FILES): %.o : %.c
 	@$(MKDIR) $(dir $@)
-	$(CC) $(CFLAGS) $(XZ_FLAGS) -DHAVE_CONFIG_H $< -c -o $@
+	$(CC) $(CFLAGS) $(XZ_FLAGS) -DHAVE_CHECK_CRC32 -DMYTHREAD_POSIX -DHAVE_CONFIG_H $< -c -o $@
 
 $(ZLIB_FILES): %.o : %.c
 	@$(MKDIR) $(dir $@)
@@ -703,6 +731,10 @@ $(ZLIB_FILES): %.o : %.c
 $(ZLIB_NG_FILES): %.o : %.c
 	@$(MKDIR) $(dir $@)
 	$(CC) $(CFLAGS) -Ilz/zlib-ng $< -c -o $@
+
+$(ZSTD_FILES): %.o : %.c
+	@$(MKDIR) $(dir $@)
+	$(CC) $(CFLAGS) $(ZSTD_FLAGS) $< -c -o $@
 
 $(ZPAQ_FILES): %.o : %.cpp
 	@$(MKDIR) $(dir $@)
