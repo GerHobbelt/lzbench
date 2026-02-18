@@ -19,7 +19,7 @@
 
 
 #define PROGNAME "lzbench"
-#define PROGVERSION "2.1.1"
+#define PROGVERSION "2.2.1"
 #define PAD_SIZE (1024)
 #define MIN_PAGE_SIZE 4096  // smallest page size we expect, if it's wrong the first algorithm might be a bit slower
 #define DEFAULT_LOOP_TIME (100*1000000)  // 1/10 of a second
@@ -156,6 +156,11 @@ typedef struct
     const char* params;
 } alias_desc_t;
 
+#if defined(_OPENMP)
+    #define BSC_THREADING FULL_THREADING
+#else
+    #define BSC_THREADING BENCH_POOL_MT
+#endif
 
 static const compressor_desc_t comp_desc[] =
 {
@@ -163,16 +168,16 @@ static const compressor_desc_t comp_desc[] =
      // name,       name_version,    first_level,  additional_param,  compress_func,               decompress_func,               init_func,               deinit_func
     { "memcpy",     "memcpy",                  0,   0,    0,  BENCH_POOL_MT, lzbench_memcpy,              lzbench_memcpy,                NULL,                    NULL },
     { "brieflz",    "brieflz 1.3.0",           1,   9,    0,  BENCH_POOL_MT, lzbench_brieflz_compress,    lzbench_brieflz_decompress,    lzbench_brieflz_init,    lzbench_brieflz_deinit },
-    { "brotli",     "brotli 1.1.0",            0,  11,    0,  BENCH_POOL_MT, lzbench_brotli_compress,     lzbench_brotli_decompress,     NULL,                    NULL },
-    { "brotli22",   "brotli 1.1.0 -d22",       0,  11,   22,  BENCH_POOL_MT, lzbench_brotli_compress,     lzbench_brotli_decompress,     NULL,                    NULL },
-    { "brotli24",   "brotli 1.1.0 -d24",       0,  11,   24,  BENCH_POOL_MT, lzbench_brotli_compress,     lzbench_brotli_decompress,     NULL,                    NULL },
-    { "bsc0",       "bsc 3.3.11 -m0 -e2",      0,   0,    0,  BENCH_POOL_MT, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
-    { "bsc1",       "bsc 3.3.11 -m0 -e1",      0,   0,    1,  BENCH_POOL_MT, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
-    { "bsc2",       "bsc 3.3.11 -m0 -e0",      0,   0,    2,  BENCH_POOL_MT, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
-    { "bsc3",       "bsc 3.3.11 -m3 -e1",      0,   0,    3,  BENCH_POOL_MT, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
-    { "bsc4",       "bsc 3.3.11 -m4 -e1",      0,   0,    4,  BENCH_POOL_MT, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
-    { "bsc5",       "bsc 3.3.11 -m5 -e1",      0,   0,    5,  BENCH_POOL_MT, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
-    { "bsc6",       "bsc 3.3.11 -m6 -e1",      0,   0,    6,  BENCH_POOL_MT, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
+    { "brotli",     "brotli 1.2.0",            0,  11,    0,  BENCH_POOL_MT, lzbench_brotli_compress,     lzbench_brotli_decompress,     NULL,                    NULL },
+    { "brotli22",   "brotli 1.2.0 -d22",       0,  11,   22,  BENCH_POOL_MT, lzbench_brotli_compress,     lzbench_brotli_decompress,     NULL,                    NULL },
+    { "brotli24",   "brotli 1.2.0 -d24",       0,  11,   24,  BENCH_POOL_MT, lzbench_brotli_compress,     lzbench_brotli_decompress,     NULL,                    NULL },
+    { "bsc0",       "bsc 3.3.11 -m0 -e2",      0,   0,    0,  BSC_THREADING, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
+    { "bsc1",       "bsc 3.3.11 -m0 -e1",      0,   0,    1,  BSC_THREADING, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
+    { "bsc2",       "bsc 3.3.11 -m0 -e0",      0,   0,    2,  BSC_THREADING, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
+    { "bsc3",       "bsc 3.3.11 -m3 -e1",      0,   0,    3,  BSC_THREADING, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
+    { "bsc4",       "bsc 3.3.11 -m4 -e1",      0,   0,    4,  BSC_THREADING, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
+    { "bsc5",       "bsc 3.3.11 -m5 -e1",      0,   0,    5,  BSC_THREADING, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
+    { "bsc6",       "bsc 3.3.11 -m6 -e1",      0,   0,    6,  BSC_THREADING, lzbench_bsc_compress,        lzbench_bsc_decompress,        lzbench_bsc_init,        NULL },
     { "bsc_cuda0",  "bsc 3.3.11 -G -m0 -e2",   0,   0,    0,  BENCH_POOL_MT, lzbench_bsc_cuda_compress,   lzbench_bsc_cuda_decompress,   lzbench_bsc_init,        NULL },
     { "bsc_cuda1",  "bsc 3.3.11 -G -m0 -e1",   0,   0,    1,  BENCH_POOL_MT, lzbench_bsc_cuda_compress,   lzbench_bsc_cuda_decompress,   lzbench_bsc_init,        NULL },
     { "bsc_cuda2",  "bsc 3.3.11 -G -m0 -e0",   0,   0,    2,  BENCH_POOL_MT, lzbench_bsc_cuda_compress,   lzbench_bsc_cuda_decompress,   lzbench_bsc_init,        NULL },
@@ -225,9 +230,10 @@ static const compressor_desc_t comp_desc[] =
     { "lzsse8",     "lzsse8 2019-04-18",       0,  17,    0,  BENCH_POOL_MT, lzbench_lzsse8_compress,     lzbench_lzsse8_decompress,     lzbench_lzsse8_init,     lzbench_lzsse8_deinit },
     { "lzsse8fast", "lzsse8fast 2019-04-18",   0,   0,    0,  BENCH_POOL_MT, lzbench_lzsse8fast_compress, lzbench_lzsse8_decompress,     lzbench_lzsse8fast_init, lzbench_lzsse8fast_deinit },
     { "lzvn",       "lzvn 2017-03-08",         0,   0,    0,  BENCH_POOL_MT, lzbench_lzvn_compress,       lzbench_lzvn_decompress,       lzbench_lzvn_init,       lzbench_lzvn_deinit },
+    { "memlz",      "memlz 0.2 beta",          0,   0,    0,  BENCH_POOL_MT, lzbench_memlz_compress,      lzbench_memlz_decompress,      lzbench_memlz_init,      lzbench_memlz_deinit },
     { "nvcomp_lz4", "nvcomp_lz4 2.2.0",        0,   7,    0,  BENCH_POOL_MT, lzbench_nvcomp_compress,     lzbench_nvcomp_decompress,     lzbench_nvcomp_init,     lzbench_nvcomp_deinit },
     { "ppmd8",      "ppmd8 25.01",             1,   9,    0,  BENCH_POOL_MT, lzbench_ppmd_compress,       lzbench_ppmd_decompress,       NULL,                    NULL },
-    { "quicklz",    "quicklz 1.5.0",           1,   3,    0,  BENCH_POOL_MT, lzbench_quicklz_compress,    lzbench_quicklz_decompress,    NULL,                    NULL },
+    { "quicklz",    "quicklz 1.5.1 beta 7",    1,   3,    0,  BENCH_POOL_MT, lzbench_quicklz_compress,    lzbench_quicklz_decompress,    NULL,                    NULL },
     { "slz_deflate","slz_deflate 1.2.1",       1,   3,    2,  BENCH_POOL_MT, lzbench_slz_compress,        lzbench_slz_decompress,        NULL,                    NULL },
     { "slz_gzip",   "slz_gzip 1.2.1",          1,   3,    1,  BENCH_POOL_MT, lzbench_slz_compress,        lzbench_slz_decompress,        NULL,                    NULL },
     { "slz_zlib",   "slz_zlib 1.2.1",          1,   3,    0,  BENCH_POOL_MT, lzbench_slz_compress,        lzbench_slz_decompress,        NULL,                    NULL },
@@ -277,27 +283,37 @@ static const alias_desc_t alias_desc[] =
               "xz,1,3,5,7,9/zlib,1,6,9/zlib-ng,1,6,9/zstd_fast,-5,-3,-1/zstd,1,2,5,8,11,15,18,22" },
     { "MAINSTREAM", "Represents mainstream compressors.",
               "memcpy/lz4fast,17,9,5/lz4/lz4hc,1,3,9/zstd_fast,-5,-3,-1/zstd,1,3,7,12,17,22/zlib,1,6,9/lzma,0,4,9/bzip2,1,9/ppmd8,4" },
-    { "OPT",  "Includes compressors that use optimal parsing (slow compression, fast decompression).",
-              "memcpy/brotli,6,7,8,9,10,11/fastlzma2,1,2,3,4,5,6,7,8,9,10/lzham,0,1,2,3,4/" \
-              "lzlib,0,1,2,3,4,5,6,7,8,9/lzma,0,1,2,3,4,5,6,7,8,9/xz,1,2,3,4,5,6,7,8,9/zstd,18,19,20,21,22" },
-    { "CUDA",     "Represents all CUDA-based compressors.",
-                  "memcpy/cudaMemcpy/nvcomp_lz4/bsc_cuda" },
+    { "INT_MT",   "Covers all compressors supporting internal multi-threading with -I option.",
+                  "memcpy/bsc0/bsc1/bsc4/bsc5/bsc6/fastlzma2,1,5,10/kanzi,1,2,3,4,5,6,7/lzham,1,4/lzma,0,4,9/xz,0,4,9/zstd,1,5,9,14,18,22" },
+    { "OPT",      "Includes compressors that use optimal parsing (slow compression, fast decompression).",
+                  "memcpy/brotli,6,7,8,9,10,11/fastlzma2,1,2,3,4,5,6,7,8,9,10/lzham,0,1,2,3,4/" \
+                  "lzlib,0,1,2,3,4,5,6,7,8,9/lzma,0,1,2,3,4,5,6,7,8,9/xz,1,2,3,4,5,6,7,8,9/zstd,18,19,20,21,22" },
     { "SYMMETRIC","Includes compressors with similar compression and decompression speeds.",
                   "memcpy/bsc/bzip2/bzip3/density,1,2,3/ppmd8/zpaq" },
     { "MISC",     "Covers miscellaneous compressors.",
                   "memcpy/crush/lzjb/tamp/tornado/zling" },
-    { "INT_MT",   "Covers all compressors supporting internal multi-threading with -I option.",
-                  "memcpy/fastlzma2,1,5,10/kanzi,1,2,3,4,5,6,7/lzham,0,4/lzma,0,4,9/xz,0,4,9/zstd,1,5,9,14,18,22" },
     { "BUGGY",    "Lists potentially unstable codecs that may cause segmentation faults.",
                   "memcpy/csc/gipfeli/lzmat/lzrw/lzsse8fast/wflz/yalz77/yappy" }, // these can SEGFAULT
+#if !defined(BENCH_REMOVE_UCL)
     { "UCL",      "Refers to all UCL compressor variants.",
                   "ucl_nrv2b/ucl_nrv2d/ucl_nrv2e" },
+#endif
+#if !defined(BENCH_REMOVE_LZO)
     { "LZO",      "Represents all LZO compressor variants.",
                   "lzo1/lzo1a/lzo1b/lzo1c/lzo1f/lzo1x/lzo1y/lzo1z/lzo2a" },
+#endif
+#if !defined(BENCH_REMOVE_BSC)
     { "BSC",      "Represents all bsc compressor variants.",
                   "bsc0/bsc1/bsc2/bsc3/bsc4/bsc5/bsc6" },
+#endif
+#if !defined(BENCH_REMOVE_BSC) && defined(BENCH_HAS_CUDA)
     { "BSC_CUDA", "Represents all bsc_cuda compressor variants.",
                   "bsc_cuda0/bsc_cuda1/bsc_cuda2/bsc_cuda3/bsc_cuda4/bsc_cuda5/bsc_cuda6/bsc_cuda7/bsc_cuda8" },
+#endif
+#ifdef BENCH_HAS_CUDA
+    { "CUDA",     "Represents all CUDA-based compressors.",
+                  "memcpy/cudaMemcpy/nvcomp_lz4/bsc_cuda" },
+#endif
     { "lzo1",     nullptr, "lzo1,1,99" },
     { "lzo1a",    nullptr, "lzo1a,1,99" },
     { "lzo1b",    nullptr, "lzo1b,1,2,3,4,5,6,7,8,9,99,999" },

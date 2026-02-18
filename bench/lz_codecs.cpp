@@ -26,6 +26,38 @@ int64_t lzbench_memcpy(char *inbuf, size_t insize, char *outbuf, size_t outsize,
 
 
 
+#ifndef BENCH_REMOVE_MEMLZ
+#include "lz/memlz/memlz.h"
+
+char* lzbench_memlz_init(size_t insize, size_t level, size_t)
+{
+    return (char*)malloc(sizeof(memlz_state));
+}
+
+void lzbench_memlz_deinit(char* workmem)
+{
+    free(workmem);
+}
+
+int64_t lzbench_memlz_compress(char* inbuf, size_t insize, char* outbuf, size_t outsize, codec_options_t* codec_options)
+{
+    if (!codec_options->work_mem)
+        return 0;
+
+    memlz_reset((memlz_state*)codec_options->work_mem);
+    return memlz_stream_compress(outbuf, inbuf, insize, (memlz_state*)codec_options->work_mem);
+}
+
+int64_t lzbench_memlz_decompress(char* inbuf, size_t insize, char* outbuf, size_t outsize, codec_options_t* codec_options)
+{
+    memlz_reset((memlz_state*)codec_options->work_mem);
+    return (int64_t)memlz_stream_decompress(outbuf, inbuf, (memlz_state*)codec_options->work_mem);
+}
+
+#endif // BENCH_REMOVE_MEMLZ
+
+
+
 #ifndef BENCH_REMOVE_BRIEFLZ
 #include "lz/brieflz/brieflz.h"
 
@@ -1116,12 +1148,11 @@ int64_t lzbench_lzsse8fast_compress(char *inbuf, size_t insize, char *outbuf, si
 
 #ifndef BENCH_REMOVE_QUICKLZ
 #include "quicklz/quicklz151b7.h"
-#include "quicklz/quicklz.h"
 
 int64_t lzbench_quicklz_compress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
 {
     int64_t res;
-    qlz150_state_compress* state = (qlz150_state_compress*) calloc(1, std::max(qlz_get_setting_3(1),std::max(qlz_get_setting_1(1), qlz_get_setting_2(1))));
+    qlz_state_compress* state = (qlz_state_compress*) calloc(1, std::max(qlz151_get_setting_3(1),std::max(qlz151_get_setting_1(1), qlz151_get_setting_2(1))));
     if (!state)
         return 0;
 
@@ -1129,10 +1160,9 @@ int64_t lzbench_quicklz_compress(char *inbuf, size_t insize, char *outbuf, size_
     switch (codec_options->level)
     {
         default:
-        case 1:	res = qlz_compress_1(inbuf, outbuf, insize, (qlz150_state_compress*)state); break;
-        case 2:	res = qlz_compress_2(inbuf, outbuf, insize, (qlz150_state_compress*)state); break;
-        case 3:	res = qlz_compress_3(inbuf, outbuf, insize, (qlz150_state_compress*)state); break;
-        case 4:	res = qlz_compress(inbuf, outbuf, insize, (qlz_state_compress*)state); break;
+        case 1:	res = qlz151_compress_1(inbuf, outbuf, insize, (qlz_state_compress*)state); break;
+        case 2:	res = qlz151_compress_2(inbuf, outbuf, insize, (qlz_state_compress*)state); break;
+        case 3:	res = qlz151_compress_3(inbuf, outbuf, insize, (qlz_state_compress*)state); break;
     }
 
     free(state);
@@ -1142,17 +1172,16 @@ int64_t lzbench_quicklz_compress(char *inbuf, size_t insize, char *outbuf, size_
 int64_t lzbench_quicklz_decompress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
 {
     int64_t res;
-    qlz150_state_compress* dstate = (qlz150_state_compress*) calloc(1, std::max(qlz_get_setting_3(2),std::max(qlz_get_setting_1(2), qlz_get_setting_2(2))));
+    qlz_state_compress* dstate = (qlz_state_compress*) calloc(1, std::max(qlz151_get_setting_3(2),std::max(qlz151_get_setting_1(2), qlz151_get_setting_2(2))));
     if (!dstate)
         return 0;
 
     switch (codec_options->level)
     {
         default:
-        case 1: res = qlz_decompress_1(inbuf, outbuf, (qlz150_state_decompress*)dstate); break;
-        case 2: res = qlz_decompress_2(inbuf, outbuf, (qlz150_state_decompress*)dstate); break;
-        case 3: res = qlz_decompress_3(inbuf, outbuf, (qlz150_state_decompress*)dstate); break;
-        case 4: res = qlz_decompress(inbuf, outbuf, (qlz_state_decompress*)dstate); break;
+        case 1: res = qlz151_decompress_1(inbuf, outbuf, (qlz_state_decompress*)dstate); break;
+        case 2: res = qlz151_decompress_2(inbuf, outbuf, (qlz_state_decompress*)dstate); break;
+        case 3: res = qlz151_decompress_3(inbuf, outbuf, (qlz_state_decompress*)dstate); break;
     }
 
     free(dstate);
@@ -1278,7 +1307,7 @@ int64_t lzbench_zlib_decompress(char *inbuf, size_t insize, char *outbuf, size_t
     int err = uncompress((uint8_t*)outbuf, &zdecomplen, (uint8_t*)inbuf, insize);
     if (err != Z_OK)
         return 0;
-    return outsize;
+    return zdecomplen;
 }
 
 #endif
@@ -1309,7 +1338,7 @@ int64_t lzbench_zlib_ng_decompress(char *inbuf, size_t insize, char *outbuf, siz
     int err = zng_uncompress((uint8_t*)outbuf, &zdecomplen, (uint8_t*)inbuf, insize);
     if (err != Z_OK)
         return 0;
-    return outsize;
+    return zdecomplen;
 }
 
 #endif

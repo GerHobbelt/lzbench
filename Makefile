@@ -114,20 +114,69 @@ endif
 
 LZ_CODECS     = bench/lz_codecs.o
 BUGGY_CODECS  = bench/buggy_codecs.o
-LZBENCH_FILES = $(LZ_CODECS) $(BUGGY_CODECS) bench/lzbench.o bench/symmetric_codecs.o bench/misc_codecs.o
+SYMMETRIC_CODECS = bench/symmetric_codecs.o
+BENCH_MAIN = bench/lzbench.o
+BENCH_FILES = $(LZ_CODECS) $(BUGGY_CODECS) $(SYMMETRIC_CODECS) $(BENCH_MAIN) bench/misc_codecs.o
 
 ifeq "$(DISABLE_THREADING)" "1"
     DEFINES += -DDISABLE_THREADING
     FASTLZMA2_FLAGS = -DFL2_SINGLETHREAD
 else
-    LZBENCH_FILES += bench/threadpool.o
+    BENCH_FILES += bench/threadpool.o
     ZSTD_FLAGS = -DZSTD_MULTITHREAD
+
+    OMP_TEST_CODE = \#include <omp.h>\nint main(){return 0;}\n
+    HAVE_OPENMP := $(shell printf '$(OMP_TEST_CODE)' | $(CXX) -x c++ - -fopenmp -o /dev/null 2>/dev/null && echo 1 || echo 0)
+
+    ifeq ($(HAVE_OPENMP),1)
+        $(info OpenMP found: compiling bsc with OMP multithreading)
+        BSC_FLAGS = -fopenmp -DLIBBSC_OPENMP_SUPPORT -DLIBSAIS_OPENMP
+        LDFLAGS += -fopenmp
+        SYMMETRIC_CXXFLAGS += -fopenmp
+        BENCH_CXXFLAGS += -fopenmp
+    else
+        $(info OpenMP not found: compiling bsc without multithreading)
+    endif
 endif
 
 # Try compiling a small test with __builtin_ctz
 # Efficient on CPUs with bit-manipulation support (e.g., RISC-V Zbb, x86 BMI1/TZCNT, ARM).
 HAVE_BUILTIN_CTZ := $(shell echo 'int main(void){return __builtin_ctz(8);}' \
     | $(CC) $(CFLAGS) -x c -o /dev/null - 2>/dev/null && echo 1 || echo 0)
+
+# Detect RISC-V Vector (RVV) support in the compiler and header files.
+# Background: Snappy upstream recently added an RVV-accelerated path for
+# RISC-V.  The source code uses two different spellings:
+#   1. With __riscv_ prefix (new spec, e.g. __riscv_vsetvl_e8m1)
+#   2. Without prefix           (old spec, e.g. vsetvl_e8m1)
+#
+# Implementation notes:
+#  - A one-line C file is generated on-the-fly with printf.
+#  - The "pound" trick. This is the simplest and most effective way to handle '#'
+    # in Makefiles. 'pound' will hold a literal '#' character.
+
+pound := \#
+rvv_prefix=__riscv_
+# We use $(pound) to insert the '#' character. This happens *before* the shell
+SNAPPY_RVV=printf '%s\n' \
+        '$(pound)include <riscv_vector.h>' \
+        '$(pound)include <stdint.h>' \
+        '$(pound)include <stddef.h>' \
+        'int main() {' \
+        '    uint8_t val = 3;' \
+        '    size_t vl = $(rvv_prefix)vsetvl_e8m1(8);' \
+        '    vuint8m1_t v = $(rvv_prefix)vmv_v_x_u8m1(val, vl);' \
+        '    (void)v;' \
+        '    return 0;' \
+        '}' \
+    | $(CC)  $(CFLAGS) -x c -o /dev/null - 2>/dev/null \
+    && echo 1 || echo 0 
+
+#   1. With __riscv_ prefix (new spec, e.g. __riscv_vsetvl_e8m1)
+SNAPPY_RVV_1:=$(shell $(SNAPPY_RVV))
+#   2. Without prefix           (old spec, e.g. vsetvl_e8m1)
+rvv_prefix=
+SNAPPY_RVV_0_7:=$(shell $(SNAPPY_RVV))
 
 # Density and Rust related detection
 HOST_ARCH   := $(shell uname -m)
@@ -176,12 +225,12 @@ ifeq "$(DONT_BUILD_BROTLI)" "1"
     DEFINES += -DBENCH_REMOVE_BROTLI
 else
     BROTLI_FILES = lz/brotli/common/constants.o lz/brotli/common/context.o lz/brotli/common/dictionary.o lz/brotli/common/platform.o lz/brotli/common/transform.o
-    BROTLI_FILES += lz/brotli/dec/bit_reader.o lz/brotli/dec/decode.o lz/brotli/dec/huffman.o lz/brotli/dec/state.o
+    BROTLI_FILES += lz/brotli/dec/bit_reader.o lz/brotli/dec/decode.o lz/brotli/dec/huffman.o lz/brotli/dec/prefix.o lz/brotli/dec/state.o lz/brotli/dec/static_init.o
     BROTLI_FILES += lz/brotli/enc/backward_references.o lz/brotli/enc/block_splitter.o lz/brotli/enc/brotli_bit_stream.o lz/brotli/enc/encode.o lz/brotli/enc/encoder_dict.o
     BROTLI_FILES += lz/brotli/enc/entropy_encode.o lz/brotli/enc/fast_log.o lz/brotli/enc/histogram.o lz/brotli/enc/command.o lz/brotli/enc/literal_cost.o lz/brotli/enc/memory.o
-    BROTLI_FILES += lz/brotli/enc/metablock.o lz/brotli/enc/static_dict.o lz/brotli/enc/utf8_util.o lz/brotli/enc/compress_fragment.o lz/brotli/enc/compress_fragment_two_pass.o
-    BROTLI_FILES += lz/brotli/enc/cluster.o lz/brotli/enc/bit_cost.o lz/brotli/enc/backward_references_hq.o lz/brotli/enc/dictionary_hash.o lz/brotli/common/shared_dictionary.o
-    BROTLI_FILES += lz/brotli/enc/compound_dictionary.o
+    BROTLI_FILES += lz/brotli/enc/metablock.o lz/brotli/enc/static_dict.o lz/brotli/enc/static_dict_lut.o lz/brotli/enc/static_init.o lz/brotli/enc/utf8_util.o
+    BROTLI_FILES += lz/brotli/enc/compress_fragment.o lz/brotli/enc/compress_fragment_two_pass.o lz/brotli/enc/cluster.o lz/brotli/enc/bit_cost.o lz/brotli/enc/backward_references_hq.o
+    BROTLI_FILES += lz/brotli/enc/dictionary_hash.o lz/brotli/common/shared_dictionary.o lz/brotli/enc/compound_dictionary.o
 endif
 
 
@@ -345,7 +394,7 @@ endif
 ifeq "$(DONT_BUILD_QUICKLZ)" "1"
     DEFINES += -DBENCH_REMOVE_QUICKLZ
 else
-    QUICKLZ_FILES = lz/quicklz/quicklz151b7.o lz/quicklz/quicklz1.o lz/quicklz/quicklz2.o lz/quicklz/quicklz3.o
+    QUICKLZ_FILES = lz/quicklz/quicklz_lvl1.o lz/quicklz/quicklz_lvl2.o lz/quicklz/quicklz_lvl3.o
 endif
 
 
@@ -362,6 +411,13 @@ else
     SNAPPY_FILES = lz/snappy/snappy-sinksource.o lz/snappy/snappy-stubs-internal.o lz/snappy/snappy.o
     ifeq ($(HAVE_BUILTIN_CTZ), 1)
         SNAPPY_FLAGS += -DHAVE_BUILTIN_CTZ
+    endif
+    ifeq ($(SNAPPY_RVV_1),1)
+        SNAPPY_FLAGS += -DSNAPPY_RVV_1
+    endif
+
+    ifeq ($(SNAPPY_RVV_0_7),1)
+        SNAPPY_FLAGS += -DSNAPPY_RVV_0_7
     endif
 endif
 
@@ -598,16 +654,17 @@ endif
 
 
 
-# CUDA-based codecs
-CUDA_BASE ?= /usr/local/cuda
-LIBCUDART=$(wildcard $(CUDA_BASE)/lib64/libcudart.so)
+ifeq "$(ENABLE_CUDA)" "1"
+  # CUDA-based codecs
+  CUDA_BASE ?= /usr/local/cuda
+  LIBCUDART=$(wildcard $(CUDA_BASE)/lib64/libcudart.so)
 
-ifeq "$(LIBCUDART)" ""
+  ifeq "$(LIBCUDART)" ""
     $(info CUDA Toolkit not found at $(CUDA_BASE), CUDA support will be disabled.)
     $(info Run "make CUDA_BASE=..." to use a different path.)
     CUDA_BASE =
     LIBCUDART =
-else
+  else
     DEFINES += -DBENCH_HAS_CUDA -I$(CUDA_BASE)/include
     LDFLAGS += -L$(CUDA_BASE)/lib64 -lcudart -Wl,-rpath=$(CUDA_BASE)/lib64
     CUDA_COMPILER = nvcc
@@ -615,30 +672,30 @@ else
     CUDA_ARCH = 50 52 60 61 70 75 80 86 89
     CUDA_CXXFLAGS = -x cu -std=c++14 -O3 $(foreach ARCH, $(CUDA_ARCH), --generate-code=arch=compute_$(ARCH),code=[compute_$(ARCH),sm_$(ARCH)]) --expt-extended-lambda -forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets
 
-ifneq "$(DONT_BUILD_NVCOMP)" "1"
+  ifneq "$(DONT_BUILD_NVCOMP)" "1"
     DEFINES += -DBENCH_HAS_NVCOMP
     NVCOMP_CPP_SRC = $(wildcard misc/nvcomp/src/*.cpp misc/nvcomp/src/lowlevel/*.cpp)
     NVCOMP_CPP_OBJ = $(NVCOMP_CPP_SRC:%=%.o)
     NVCOMP_CU_SRC  = $(wildcard misc/nvcomp/src/*.cu misc/nvcomp/src/lowlevel/*.cu)
     NVCOMP_CU_OBJ  = $(NVCOMP_CU_SRC:%=%.o)
     NVCOMP_FILES   = $(NVCOMP_CU_OBJ) $(NVCOMP_CPP_OBJ)
-endif
+  endif
 
-ifneq "$(DONT_BUILD_BSC)" "1"
+  ifneq "$(DONT_BUILD_BSC)" "1"
     BSC_FLAGS += -DLIBBSC_CUDA_SUPPORT
     BSC_CUDA_FILES = bwt/libbsc/libbsc/bwt/libcubwt/libcubwt.cu.o bwt/libbsc/libbsc/st/st.cu.o
-endif
-endif # ifneq "$(LIBCUDART)"
-
+  endif
+  endif # ifneq "$(LIBCUDART)"
+endif # ifeq "$(ENABLE_CUDA)"
 
 
 MKDIR = mkdir -p
 
-lzbench: $(BUGGY_C_FILES) $(BUGGY_CC_FILES) $(BUGGY_CXX_FILES) $(CSC_FILES) $(BSC_C_FILES) $(BSC_CXX_FILES) $(BSC_CUDA_FILES) $(BZIP2_FILES) $(BZIP3_FILES) $(KANZI_FILES) $(FASTLZMA2_OBJ) $(ZSTD_FILES) $(LZSSE_FILES) $(LZFSE_FILES) $(XZ_FILES) $(LIBLZG_FILES) $(BRIEFLZ_FILES) $(LZF_FILES) $(BROTLI_FILES) $(LZMA_FILES) $(ZLING_FILES) $(QUICKLZ_FILES) $(SNAPPY_FILES) $(ZLIB_FILES) $(ZLIB_NG_FILES) $(LZHAM_FILES) $(LZO_FILES) $(UCL_FILES) $(LZ4_FILES) $(LIZARD_FILES) $(LIBDEFLATE_FILES) $(MISC_FILES) $(NVCOMP_FILES) $(LZBENCH_FILES) $(PPMD_FILES)
+lzbench: $(BUGGY_C_FILES) $(BUGGY_CC_FILES) $(BUGGY_CXX_FILES) $(CSC_FILES) $(BSC_C_FILES) $(BSC_CXX_FILES) $(BSC_CUDA_FILES) $(BZIP2_FILES) $(BZIP3_FILES) $(KANZI_FILES) $(FASTLZMA2_OBJ) $(ZSTD_FILES) $(LZSSE_FILES) $(LZFSE_FILES) $(XZ_FILES) $(LIBLZG_FILES) $(BRIEFLZ_FILES) $(LZF_FILES) $(BROTLI_FILES) $(LZMA_FILES) $(ZLING_FILES) $(QUICKLZ_FILES) $(SNAPPY_FILES) $(ZLIB_FILES) $(ZLIB_NG_FILES) $(LZHAM_FILES) $(LZO_FILES) $(UCL_FILES) $(LZ4_FILES) $(LIZARD_FILES) $(LIBDEFLATE_FILES) $(MISC_FILES) $(NVCOMP_FILES) $(BENCH_FILES) $(PPMD_FILES)
 	$(CXX) $^ -o $@ $(LDFLAGS)
 	@echo Linked GCC_VERSION=$(GCC_VERSION) CLANG_VERSION=$(CLANG_VERSION) COMPILER=$(COMPILER)
 
-bench/lzbench.o: bench/lzbench.cpp bench/lzbench.h bench/threadpool.h bench/codecs.h DENSITY_LIB
+$(BENCH_MAIN): bench/lzbench.cpp bench/lzbench.h bench/threadpool.h bench/codecs.h DENSITY_LIB
 
 # disable the implicit rule for making a binary out of a single object file
 %: %.o
@@ -667,6 +724,10 @@ $(BUGGY_C_FILES): %.o : %.c
 $(BUGGY_CC_FILES): %.o : %.cc
 	@$(MKDIR) $(dir $@)
 	$(CXX) $(CFLAGS_O2) $< -c -o $@
+
+$(BENCH_MAIN): %.o : %.cpp
+	@$(MKDIR) $(dir $@)
+	$(CXX) $(CXXFLAGS) $(BENCH_CXXFLAGS) $< -c -o $@
 
 $(BUGGY_CODECS): %.o : %.cpp
 	@$(MKDIR) $(dir $@)
@@ -715,6 +776,14 @@ $(LZSSE_FILES): %.o : %.cpp
 $(SNAPPY_FILES): %.o : %.cc
 	@$(MKDIR) $(dir $@)
 	$(CXX) $(CXXFLAGS) $(SNAPPY_FLAGS) $< -c -o $@
+
+$(SYMMETRIC_CODECS): %.o : %.cpp
+	@$(MKDIR) $(dir $@)
+	$(CXX) $(CXXFLAGS) $(SYMMETRIC_CXXFLAGS) $< -c -o $@
+
+lz/quicklz/quicklz_lvl%.o: lz/quicklz/quicklz151b7.c
+	@$(MKDIR) $(dir $@)
+	$(CC) $(CFLAGS) -DQLZ_COMPRESSION_LEVEL=$* $< -c -o $@
 
 $(UCL_FILES): %.o : %.c
 	@$(MKDIR) $(dir $@)

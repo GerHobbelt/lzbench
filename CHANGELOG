@@ -1,7 +1,12 @@
-v2.x.y
+v2.x.y (work in progress)
+- added memlz 0.2 beta
+- updated brotli to 1.2.0 (thanks to @data-man)
+- updated quicklz to 1.5.1 beta 7
+
+v2.2 (Oct 28, 2025)
 - improvement: Automatic chunk size splitting for multi-threading (-T) when -b is not specified
 - improvement: Added the -I# option, which enables compression using # internal (built-in) threads
-               when supported. Currently available for the following compressors: fast-lzma2,
+               when supported. Currently available for the following compressors: bsc, fast-lzma2,
                kanzi, lzham, lzma, xz, and zstd.
 - added zpaq v7.15 (thanks to @rsreds)
 - updated GLZA to v0.11.8 (thanks to @tansy)
