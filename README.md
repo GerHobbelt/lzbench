@@ -66,7 +66,7 @@ Supported compressors
  - [libdeflate v1.24](https://github.com/ebiggers/libdeflate)
  - [lizard v2.1](https://github.com/inikep/lizard)
  - [lz4/lz4hc v1.10.0](https://github.com/lz4/lz4)
- - [lzav 4.22](https://github.com/avaneev/lzav)
+ - [lzav 5.7](https://github.com/avaneev/lzav)
  - [lzf 3.6](http://software.schmorp.de/pkg/liblzf.html)
  - [lzfse/lzvn 1.0](https://github.com/lzfse/lzfse)
  - [lzg 1.0.10](https://github.com/mbitsnbites/liblzg)
@@ -91,6 +91,7 @@ Supported compressors
  - [zling 2018-10-12](https://github.com/richox/libzling) - according to the author using libzling in a production environment is not a good idea
  - [zpaq 7.15](https://github.com/zpaq/zpaq)
  - [zstd 1.5.7](https://github.com/facebook/zstd)
+ - [zxc 0.7.2](https://github.com/hellobertrand/zxc)
 
 **Warning**: The compressors listed below have security issues and/or are
 no longer maintained. For information about the security of the various compressors,
