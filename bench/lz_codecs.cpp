@@ -26,6 +26,7 @@ int64_t lzbench_memcpy(char *inbuf, size_t insize, char *outbuf, size_t outsize,
 
 
 #ifndef BENCH_REMOVE_MEMLZ
+#define MEMLZ_IMPLEMENTATION
 #include "lz/memlz/memlz.h"
 
 char* lzbench_memlz_init(size_t insize, size_t level, size_t)
@@ -325,8 +326,10 @@ int64_t lzbench_libdeflate_decompress(char *inbuf, size_t insize, char *outbuf, 
         return 0;
     size_t res = 0;
     if (libdeflate_deflate_decompress(decompressor, inbuf, insize, outbuf, outsize, &res) != LIBDEFLATE_SUCCESS) {
+        libdeflate_free_decompressor(decompressor);
         return 0;
     }
+    libdeflate_free_decompressor(decompressor);
     return res;
 }
 #endif
