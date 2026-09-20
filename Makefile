@@ -174,7 +174,7 @@ SNAPPY_RVV=printf '%s\n' \
         '    return 0;' \
         '}' \
     | $(CC)  $(CFLAGS) -x c -o /dev/null - 2>/dev/null \
-    && echo 1 || echo 0 
+    && echo 1 || echo 0
 
 #   1. With __riscv_ prefix (new spec, e.g. __riscv_vsetvl_e8m1)
 SNAPPY_RVV_1:=$(shell $(SNAPPY_RVV))
@@ -216,11 +216,33 @@ ifneq ($(DONT_BUILD_DENSITY),1)
     endif
 endif
 
+HAVE_ZIG := $(shell command -v zig >/dev/null 2>&1 && echo 1 || echo 0)
+
+ifneq ($(HAVE_ZIG),1)
+    DONT_BUILD_SKIM ?= 1
+endif
+
+ifeq "$(DONT_BUILD_SKIM)" "1"
+    DEFINES += -DBENCH_REMOVE_SKIM
+else
+    SKIM_FILE = misc/skim/libskim.a
+endif
+
+# memlz performs unaligned 64-bit loads in its match finder, which fault
+# (SIGBUS) on 32-bit ARM (armv5/v7); disable it on 32-bit ARM targets only.
+# (aceapex uses alignment-safe loads since ax_align.h and builds everywhere.)
+ifneq (,$(filter arm armeb armv%,$(TARGET_ARCH)))
+    DONT_BUILD_MEMLZ ?= 1
+endif
 
 ifeq "$(DONT_BUILD_ACEAPEX)" "1"
     DEFINES += -DBENCH_REMOVE_ACEAPEX
 else
     ACEAPEX_FILES = lz/aceapex/aceapex_lzbench.o
+endif
+
+ifeq "$(DONT_BUILD_MEMLZ)" "1"
+    DEFINES += -DBENCH_REMOVE_MEMLZ
 endif
 
 
@@ -726,6 +748,8 @@ ifeq "$(ENABLE_CUDA)" "1"
     CUDA_ARCH = 50 52 60 61 70 75 80 86 89
     CUDA_CXXFLAGS = -x cu -std=c++14 -O3 $(foreach ARCH, $(CUDA_ARCH), --generate-code=arch=compute_$(ARCH),code=[compute_$(ARCH),sm_$(ARCH)]) --expt-extended-lambda -forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets
 
+    ACEAPEX_CUDA_FILES = lz/aceapex/cuda/aceapex_cuda.cu.o lz/aceapex/cuda/aceapex_cuda_lzbench.o
+
   ifneq "$(DONT_BUILD_NVCOMP)" "1"
     DEFINES += -DBENCH_HAS_NVCOMP
     NVCOMP_CPP_SRC = $(wildcard misc/nvcomp/src/*.cpp misc/nvcomp/src/lowlevel/*.cpp)
@@ -745,7 +769,7 @@ endif # ifeq "$(ENABLE_CUDA)"
 
 MKDIR = mkdir -p
 
-lzbench: $(BUGGY_C_FILES) $(BUGGY_CC_FILES) $(BUGGY_CXX_FILES) $(ACEAPEX_FILES) $(BSC_C_FILES) $(BSC_CXX_FILES) $(BSC_CUDA_FILES) $(BZIP2_FILES) $(BZIP3_FILES) $(CSC_FILES) $(KANZI_FILES) $(FASTLZMA2_OBJ) $(ZSTD_FILES) $(LZSSE_FILES) $(LZFSE_FILES) $(XZ_FILES) $(LIBLZG_FILES) $(BRIEFLZ_FILES) $(LZF_FILES) $(BROTLI_FILES) $(LZMA_FILES) $(ZLING_FILES) $(QUICKLZ_FILES) $(SNAPPY_FILES) $(ZLIB_FILES) $(ZLIB_NG_FILES) $(LZHAM_FILES) $(LZO_FILES) $(UCL_FILES) $(LZ4_FILES) $(LIZARD_FILES) $(LIBDEFLATE_FILES) $(ZXC_FILES) $(MISC_FILES) $(NVCOMP_FILES) $(PPMD_FILES) $(BENCH_FILES)
+lzbench: $(BUGGY_C_FILES) $(BUGGY_CC_FILES) $(BUGGY_CXX_FILES) $(ACEAPEX_FILES) $(BSC_C_FILES) $(BSC_CXX_FILES) $(BSC_CUDA_FILES) $(ACEAPEX_CUDA_FILES) $(BZIP2_FILES) $(BZIP3_FILES) $(CSC_FILES) $(KANZI_FILES) $(FASTLZMA2_OBJ) $(ZSTD_FILES) $(LZSSE_FILES) $(LZFSE_FILES) $(XZ_FILES) $(LIBLZG_FILES) $(BRIEFLZ_FILES) $(LZF_FILES) $(BROTLI_FILES) $(LZMA_FILES) $(ZLING_FILES) $(QUICKLZ_FILES) $(SNAPPY_FILES) $(ZLIB_FILES) $(ZLIB_NG_FILES) $(LZHAM_FILES) $(LZO_FILES) $(UCL_FILES) $(LZ4_FILES) $(LIZARD_FILES) $(LIBDEFLATE_FILES) $(ZXC_FILES) $(MISC_FILES) $(NVCOMP_FILES) $(PPMD_FILES) $(BENCH_FILES) $(SKIM_FILE)
 	$(CXX) $^ -o $@ $(LDFLAGS)
 	@echo Linked GCC_VERSION=$(GCC_VERSION) CLANG_VERSION=$(CLANG_VERSION) COMPILER=$(COMPILER)
 
@@ -885,6 +909,14 @@ $(BSC_CXX_FILES): %.o : %.cpp
 	@$(MKDIR) $(dir $@)
 	$(CXX) $(CXXFLAGS) $(BSC_FLAGS) $< -c -o $@
 
+
+# ACEAPEX CUDA decoder
+lz/aceapex/cuda/aceapex_cuda.cu.o: lz/aceapex/cuda/aceapex_cuda.cu
+	$(CUDA_CC) $(CUDA_CXXFLAGS) $(CXXFLAGS) -c $< -o $@
+
+lz/aceapex/cuda/aceapex_cuda_lzbench.o: lz/aceapex/cuda/aceapex_cuda_lzbench.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
 $(BSC_CUDA_FILES): %.cu.o: %.cu
 	@$(MKDIR) $(dir $@)
 	$(CUDA_CC) $(CUDA_CXXFLAGS) $(CXXFLAGS) $(BSC_FLAGS) -c $< -o $@
@@ -897,7 +929,12 @@ ifneq ($(DONT_BUILD_DENSITY),1)
 	cargo rustc --crate-type=$(DENSITY_BUILD_TYPE) --release -- --print=native-static-libs
 endif
 
+misc/skim/libskim.a: misc/skim/src/root.zig
+	@echo "Building Skim (Zig)..."
+	cd misc/skim && zig build-lib -O ReleaseFast -femit-bin=libskim.a src/root.zig -lc
+
 clean:
 	rm -rf lzbench lzbench.exe
 	find . -type f -name "*.o" -exec rm -f {} +
 	rm -rf $(DENSITY_SRC_DIR)target/
+	rm -f misc/skim/libskim.a

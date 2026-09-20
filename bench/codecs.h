@@ -118,7 +118,17 @@ int64_t lzbench_memcpy(char *inbuf, size_t insize, char *outbuf, size_t outsize,
     #define lzbench_density_decompress NULL
 #endif
 
-
+#ifndef BENCH_REMOVE_SKIM
+    char* lzbench_skim_init(size_t insize, size_t level, size_t);
+    void lzbench_skim_deinit(char* workmem);
+    int64_t lzbench_skim_compress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options);
+    int64_t lzbench_skim_decompress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options);
+#else
+    #define lzbench_skim_init NULL
+    #define lzbench_skim_deinit NULL
+    #define lzbench_skim_compress NULL
+    #define lzbench_skim_decompress NULL
+#endif // BENCH_REMOVE_SKIM
 
 #ifndef BENCH_REMOVE_FASTLZ
     int64_t lzbench_fastlz_compress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options);
@@ -621,6 +631,11 @@ int64_t lzbench_zxc_decompress(char *inbuf, size_t insize, char *outbuf,
     void lzbench_aceapex_deinit(char* workmem);
     int64_t lzbench_aceapex_compress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options);
     int64_t lzbench_aceapex_decompress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options);
+#ifdef BENCH_HAS_CUDA
+    char* lzbench_aceapex_cuda_init(size_t insize, size_t level, size_t threads);
+    void lzbench_aceapex_cuda_deinit(char* workmem);
+    int64_t lzbench_aceapex_cuda_decompress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options);
+#endif
     char* lzbench_aceapex_stream_init(size_t insize, size_t level, size_t threads);
     int64_t lzbench_aceapex_stream_compress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options);
     int64_t lzbench_aceapex_stream_decompress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options);
@@ -639,3 +654,4 @@ int64_t lzbench_zxc_decompress(char *inbuf, size_t insize, char *outbuf,
     #define lzbench_aceapex3_compress NULL
     #define lzbench_aceapex3_decompress NULL
 #endif // BENCH_REMOVE_ACEAPEX
+
