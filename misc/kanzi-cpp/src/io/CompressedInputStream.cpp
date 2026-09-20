@@ -687,19 +687,16 @@ void CompressedInputStream::close()
     if (EXCHANGE_ATOMIC(_closed, 1) == 1)
         return;
 
-    // Signal to break the waits in DecodingTask::run immediately.
+    // Signal to break the waits in DecodingTask::run immediately and
+    // ensure no thread is writing to _buffers before we delete them.
 #ifdef CONCURRENCY_ENABLED
     {
         std::lock_guard<std::mutex> lock(_blockMutex);
         STORE_ATOMIC(_blockId, CANCEL_TASKS_ID);
     }
-    _blockCondition.notify_all();
-#else
-    STORE_ATOMIC(_blockId, CANCEL_TASKS_ID);
-#endif
 
-#ifdef CONCURRENCY_ENABLED
-    // We must ensure no thread is writing to _buffers before we delete them.
+    _blockCondition.notify_all();
+
     for (size_t i = 0; i < _futures.size(); i++) {
         if (_futures[i].valid()) {
             try {
@@ -710,6 +707,8 @@ void CompressedInputStream::close()
             }
         }
     }
+#else
+    STORE_ATOMIC(_blockId, CANCEL_TASKS_ID);
 #endif
 
     try {
@@ -780,29 +779,18 @@ T DecodingTask<T>::run()
     bool streamPerTask = _ctx.getInt("tasks") > 1;
     uint64 tType = _ctx.getLong("tType");
     short eType = short(_ctx.getInt("eType"));
-#ifdef CONCURRENCY_ENABLED
     auto storeProcessedBlockId = [this](int value) {
+#ifdef CONCURRENCY_ENABLED
         {
             std::lock_guard<std::mutex> lock(*_blockMutex);
             STORE_ATOMIC(*_processedBlockId, value);
         }
 
         _blockCondition->notify_all();
-    };
-
-    auto compareExchangeProcessedBlockId = [this](int expected, int desired) {
-        bool updated = false;
-        {
-            std::lock_guard<std::mutex> lock(*_blockMutex);
-            updated = COMPARE_EXCHANGE_ATOMIC(*_processedBlockId, expected, desired);
-        }
-
-        if (updated == true)
-            _blockCondition->notify_all();
-
-        return updated;
-    };
+#else
+        STORE_ATOMIC(*_processedBlockId, value);
 #endif
+    };
 
 #ifdef CONCURRENCY_ENABLED
     {
@@ -816,22 +804,6 @@ T DecodingTask<T>::run()
     if (LOAD_ATOMIC(*_processedBlockId) == CompressedInputStream::CANCEL_TASKS_ID) {
         // Skip, an error occurred
         return T(*_data, blockId, 0, 0, 0, "Canceled");
-    }
-#else
-    // Lock free synchronization
-    while (true) {
-        const int taskId = LOAD_ATOMIC(*_processedBlockId);
-
-        if (taskId == CompressedInputStream::CANCEL_TASKS_ID) {
-            // Skip, an error occurred
-            return T(*_data, blockId, 0, 0, 0, "Canceled");
-        }
-
-        if (taskId == blockId - 1)
-            break;
-
-        // Back-off improves performance
-        CPU_PAUSE();
     }
 #endif
 
@@ -849,20 +821,12 @@ T DecodingTask<T>::run()
         uint64 read = _ibs->readBits(lr);
 
         if (read == 0) {
-#ifdef CONCURRENCY_ENABLED
             storeProcessedBlockId(CompressedInputStream::CANCEL_TASKS_ID);
-#else
-            STORE_ATOMIC(*_processedBlockId, CompressedInputStream::CANCEL_TASKS_ID);
-#endif
             return T(*_data, blockId, 0, 0, 0, "Success");
         }
 
         if (read > (uint64(1) << 34)) {
-#ifdef CONCURRENCY_ENABLED
             storeProcessedBlockId(CompressedInputStream::CANCEL_TASKS_ID);
-#else
-            STORE_ATOMIC(*_processedBlockId, CompressedInputStream::CANCEL_TASKS_ID);
-#endif
             return T(*_data, blockId, 0, 0, Error::ERR_BLOCK_SIZE, "Invalid block size");
         }
 
@@ -890,11 +854,7 @@ T DecodingTask<T>::run()
 
         // After completion of the bitstream reading, increment the block id.
         // It unblocks the task processing the next block (if any)
-#ifdef CONCURRENCY_ENABLED
         storeProcessedBlockId(blockId);
-#else
-        STORE_ATOMIC(*_processedBlockId, blockId);
-#endif
 
         // Check if the block must be skipped
         if (blockId < from) {
@@ -932,11 +892,7 @@ T DecodingTask<T>::run()
 
         if ((preTransformLength <= 0) || (preTransformLength > maxTransformSize)) {
             // Error => cancel concurrent decoding tasks
-#ifdef CONCURRENCY_ENABLED
             storeProcessedBlockId(CompressedInputStream::CANCEL_TASKS_ID);
-#else
-            STORE_ATOMIC(*_processedBlockId, CompressedInputStream::CANCEL_TASKS_ID);
-#endif
             stringstream ss;
             ss << "Invalid compressed block length: " << preTransformLength;
 
@@ -993,11 +949,7 @@ T DecodingTask<T>::run()
         // Block entropy decode
         if (ed->decode(_buffer->_array, 0, preTransformLength) != preTransformLength) {
             // Error => cancel concurrent decoding tasks
-#ifdef CONCURRENCY_ENABLED
             storeProcessedBlockId(CompressedInputStream::CANCEL_TASKS_ID);
-#else
-            STORE_ATOMIC(*_processedBlockId, CompressedInputStream::CANCEL_TASKS_ID);
-#endif
             delete ed;
 
             if (streamPerTask == true)
@@ -1037,6 +989,7 @@ T DecodingTask<T>::run()
         transform = nullptr;
 
         if (res == false) {
+            storeProcessedBlockId(CompressedInputStream::CANCEL_TASKS_ID);
             return T(*_data, blockId, 0, checksum1, Error::ERR_PROCESS_BLOCK,
                 "Transform inverse failed");
         }
@@ -1048,6 +1001,7 @@ T DecodingTask<T>::run()
             const uint32 checksum2 = _hasher32->hash(&_data->_array[savedIdx], decoded);
 
             if (checksum2 != uint32(checksum1)) {
+                storeProcessedBlockId(CompressedInputStream::CANCEL_TASKS_ID);
                 stringstream ss;
                 ss << "Corrupted bitstream: expected checksum " << std::hex << checksum1 << ", found " << std::hex << checksum2;
                 return T(*_data, blockId, decoded, checksum1, Error::ERR_CRC_CHECK, ss.str());
@@ -1057,6 +1011,7 @@ T DecodingTask<T>::run()
             const uint64 checksum2 = _hasher64->hash(&_data->_array[savedIdx], decoded);
 
             if (checksum2 != checksum1) {
+                storeProcessedBlockId(CompressedInputStream::CANCEL_TASKS_ID);
                 stringstream ss;
                 ss << "Corrupted bitstream: expected checksum " << std::hex << checksum1 << ", found " << std::hex << checksum2;
                 return T(*_data, blockId, decoded, checksum1, Error::ERR_CRC_CHECK, ss.str());
@@ -1066,13 +1021,8 @@ T DecodingTask<T>::run()
         return T(*_data, blockId, decoded, checksum1, 0, "Success");
     }
     catch (const exception& e) {
-        // Make sure to unfreeze next block
-	int curBlockId = blockId - 1;
-#ifdef CONCURRENCY_ENABLED
-	compareExchangeProcessedBlockId(curBlockId, blockId);
-#else
-	COMPARE_EXCHANGE_ATOMIC(*_processedBlockId, curBlockId, blockId);
-#endif
+        // Cancel any in-flight task waiting on this block.
+        storeProcessedBlockId(CompressedInputStream::CANCEL_TASKS_ID);
 
         if (transform != nullptr)
             delete transform;

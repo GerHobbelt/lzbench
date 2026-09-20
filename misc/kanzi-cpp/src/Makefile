@@ -47,6 +47,14 @@ else
 	endif
 endif	
 
+ifeq ($(DETECTED_OS),FreeBSD)
+    STATIC_LINK_FLAGS := -static
+else ifeq ($(DETECTED_OS),Darwin)
+    STATIC_LINK_FLAGS :=
+else
+    STATIC_LINK_FLAGS := -static-libstdc++ -static-libgcc
+endif
+
 LIB_COMMON_SOURCES=Global.cpp \
 	Event.cpp \
 	util/WallTimer.cpp \
@@ -102,6 +110,8 @@ TEST_SOURCES=test/TestEntropyCodec.cpp \
 	test/TestBWT.cpp \
 	test/TestCompressedStream.cpp \
 	test/TestDefaultBitStream.cpp \
+	test/TestFactories.cpp \
+	test/TestMalformedStream.cpp \
 	test/TestTransforms.cpp \
 	test/TestAPI.c
 
@@ -150,6 +160,8 @@ STATIC_DECOMP_LIB := lib$(APP)decomp$(STATIC_LIB_SUFFIX)
 SHARED_COMP_LIB := lib$(APP)comp$(SHARED_LIB_SUFFIX)
 SHARED_DECOMP_LIB := lib$(APP)decomp$(SHARED_LIB_SUFFIX)
 
+all: lib test $(APP_STATIC) $(APP_DYNAMIC)
+
 libcomp: $(STATIC_COMP_LIB) $(SHARED_COMP_LIB)
 
 libdecomp: $(STATIC_DECOMP_LIB) $(SHARED_DECOMP_LIB)
@@ -193,10 +205,16 @@ testEntropyCodec: $(LIB_OBJECTS) $(TEST_OBJ_DIR)/TestEntropyCodec.o
 testDefaultBitStream: $(LIB_OBJECTS) $(TEST_OBJ_DIR)/TestDefaultBitStream.o
 	$(CXX) $^ -o ../bin/$@ $(LDFLAGS)
 
+testFactories: $(LIB_OBJECTS) $(TEST_OBJ_DIR)/TestFactories.o
+	$(CXX) $^ -o ../bin/$@ $(LDFLAGS)
+
+testMalformedStream: $(LIB_OBJECTS) $(TEST_OBJ_DIR)/TestMalformedStream.o
+	$(CXX) $^ -o ../bin/$@ $(LDFLAGS)
+
 testCompressedStream: $(LIB_OBJECTS) $(TEST_OBJ_DIR)/TestCompressedStream.o
 	$(CXX) $^ -o ../bin/$@ $(LDFLAGS)
 
-test: testAPI testBWT testTransforms testEntropyCodec testDefaultBitStream testCompressedStream
+test: testAPI testBWT testTransforms testEntropyCodec testDefaultBitStream testFactories testMalformedStream testCompressedStream
 
 # Default executable target
 kanzi: $(LIB_OBJECTS) $(APP_OBJECTS)
@@ -208,7 +226,8 @@ ifeq ($(DETECTED_OS),Darwin)
 kanzi_static:
 	@echo "Static linking is not supported on macOS"
 else
-kanzi_static: LDFLAGS += -static-libstdc++ -static-libgcc
+# Only add the flags if we aren't on macOS
+kanzi_static: LDFLAGS += $(STATIC_LINK_FLAGS)
 kanzi_static: $(LIB_OBJECTS) $(APP_OBJECTS)
 	$(CXX) $^ -o ../bin/kanzi_static$(PROG_SUFFIX) $(LDFLAGS)
 endif
@@ -218,13 +237,13 @@ kanzi_dynamic: LDFLAGS := $(filter-out -static,$(LDFLAGS))
 kanzi_dynamic: $(LIB_OBJECTS) $(APP_OBJECTS)
 	$(CXX) $^ -o ../bin/kanzi_dynamic$(PROG_SUFFIX) $(LDFLAGS)
 
-all: lib test $(APP_STATIC) $(APP_DYNAMIC)
 
 # Install / uninstall (may require sudo or admin rights)
 ifeq ($(DETECTED_OS),Windows)
 INSTALL_DIR=C:/Program\ Files
 else
 INSTALL_DIR=/usr/local
+MAN_DIR=$(INSTALL_DIR)/share/man/man1
 endif
 
 print-vars:
@@ -259,6 +278,16 @@ else
 	install -m 644 ./util/*.hpp $(INSTALL_DIR)/include/kanzi/util
 	install -d $(INSTALL_DIR)/bin
 	install -m577 ../bin/$(APP)$(PROG_SUFFIX) $(INSTALL_DIR)/bin
+	install -d $(MAN_DIR)
+	if [ -f ../doc/kanzi.1.gz ]; then \
+		install -m 644 ../doc/kanzi.1.gz $(MAN_DIR)/$(APP).1.gz; \
+	elif [ -f ../doc/kanzi.1 ]; then \
+		gzip -n -c ../doc/kanzi.1 > $(MAN_DIR)/$(APP).1.gz; \
+		chmod 644 $(MAN_DIR)/$(APP).1.gz; \
+	else \
+		echo "Error: missing ../doc/kanzi.1.gz or ../doc/kanzi.1"; \
+		exit 1; \
+	fi
 endif
 
 # Uninstall may require sudo or admin rights
@@ -272,6 +301,7 @@ else
 	rm -f $(INSTALL_DIR)/bin/$(APP_STATIC)$(PROG_SUFFIX)
 	rm -f $(INSTALL_DIR)/bin/$(APP_DYNAMIC)$(PROG_SUFFIX)
 	rm -f $(INSTALL_DIR)/bin/$(APP)$(PROG_SUFFIX)
+	rm -f $(MAN_DIR)/$(APP).1.gz
 endif
 
 clean:

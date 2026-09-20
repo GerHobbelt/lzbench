@@ -518,7 +518,7 @@ void CompressedOutputStream::submitBlock()
     };
 
     if (_pool == nullptr) {
-        _futures[_bufferId] = std::async(taskWrapper);
+        _futures[_bufferId] = std::async(std::launch::async, taskWrapper);
     }
     else {
         // REQUIRES: Pool size > Number of concurrent tasks to avoid deadlock
@@ -626,47 +626,36 @@ T EncodingTask<T>::run()
     const int blockLength = _ctx.getInt("size");
     TransformSequence<kanzi::byte>* transform = nullptr;
     EntropyEncoder* ee = nullptr;
-#ifdef CONCURRENCY_ENABLED
     auto storeProcessedBlockId = [this](int value) {
+#ifdef CONCURRENCY_ENABLED
         {
             std::lock_guard<std::mutex> lock(*_blockMutex);
             STORE_ATOMIC(*_processedBlockId, value);
         }
 
         _blockCondition->notify_all();
+#else
+        STORE_ATOMIC(*_processedBlockId, value);
+#endif
     };
 
     auto fetchAddProcessedBlockId = [this]() {
+#ifdef CONCURRENCY_ENABLED
         {
             std::lock_guard<std::mutex> lock(*_blockMutex);
             FETCH_ADD_ATOMIC(*_processedBlockId, 1);
         }
 
         _blockCondition->notify_all();
-    };
-
-    auto compareExchangeProcessedBlockId = [this](int expected, int desired) {
-        bool updated = false;
-        {
-            std::lock_guard<std::mutex> lock(*_blockMutex);
-            updated = COMPARE_EXCHANGE_ATOMIC(*_processedBlockId, expected, desired);
-        }
-
-        if (updated == true)
-            _blockCondition->notify_all();
-
-        return updated;
-    };
+#else
+        FETCH_ADD_ATOMIC(*_processedBlockId, 1);
 #endif
+    };
 
     try {
         if (blockLength == 0) {
             // Last block (only block with 0 length)
-#ifdef CONCURRENCY_ENABLED
             fetchAddProcessedBlockId();
-#else
-            FETCH_ADD_ATOMIC(*_processedBlockId, 1);
-#endif
             return T(blockId, 0, "Success");
         }
 
@@ -756,11 +745,7 @@ T EncodingTask<T>::run()
         postTransformLength = _buffer->_index;
 
         if (postTransformLength < 0) {
-#ifdef CONCURRENCY_ENABLED
             storeProcessedBlockId(CompressedOutputStream::CANCEL_TASKS_ID);
-#else
-            STORE_ATOMIC(*_processedBlockId, CompressedOutputStream::CANCEL_TASKS_ID);
-#endif
             return T(blockId, Error::ERR_WRITE_FILE, "Invalid transform size");
         }
 
@@ -768,11 +753,7 @@ T EncodingTask<T>::run()
         const int dataSize = (postTransformLength < 256) ? 1 : (Global::_log2(uint32(postTransformLength)) >> 3) + 1;
 
         if (dataSize > 4) {
-#ifdef CONCURRENCY_ENABLED
             storeProcessedBlockId(CompressedOutputStream::CANCEL_TASKS_ID);
-#else
-            STORE_ATOMIC(*_processedBlockId, CompressedOutputStream::CANCEL_TASKS_ID);
-#endif
             return T(blockId, Error::ERR_WRITE_FILE, "Invalid block data length");
         }
 
@@ -835,11 +816,7 @@ T EncodingTask<T>::run()
         // Entropy encode block
         if (ee->encode(_buffer->_array, 0, postTransformLength) != postTransformLength) {
             delete ee;
-#ifdef CONCURRENCY_ENABLED
             storeProcessedBlockId(CompressedOutputStream::CANCEL_TASKS_ID);
-#else
-            STORE_ATOMIC(*_processedBlockId, CompressedOutputStream::CANCEL_TASKS_ID);
-#endif
             return T(blockId, Error::ERR_PROCESS_BLOCK, "Entropy coding failed");
         }
 
@@ -862,20 +839,6 @@ T EncodingTask<T>::run()
 
         if (LOAD_ATOMIC(*_processedBlockId) == CompressedOutputStream::CANCEL_TASKS_ID)
             return T(blockId, 0, "Canceled");
-#else
-        // Lock free synchronization
-        while (true) {
-            const int taskId = LOAD_ATOMIC(*_processedBlockId);
-
-            if (taskId == CompressedOutputStream::CANCEL_TASKS_ID)
-                return T(blockId, 0, "Canceled");
-
-            if (taskId == blockId - 1)
-                break;
-
-            // Back-off improves performance
-            CPU_PAUSE();
-        }
 #endif
 
         // Emit block size in bits (max size pre-entropy is 1 GB = 1 << 30 bytes)
@@ -896,11 +859,7 @@ T EncodingTask<T>::run()
 
         // After completion of the entropy coding, increment the block id.
         // It unblocks the task processing the next block (if any).
-#ifdef CONCURRENCY_ENABLED
         storeProcessedBlockId(blockId);
-#else
-        STORE_ATOMIC(*_processedBlockId, blockId);
-#endif
 
         if (_listeners.size() > 0) {
             // Notify after entropy
@@ -925,13 +884,8 @@ T EncodingTask<T>::run()
         return T(blockId, 0, "Success");
     }
     catch (const exception& e) {
-        // Make sure to unfreeze next block
-	int curBlockId = blockId - 1;
-#ifdef CONCURRENCY_ENABLED
-	compareExchangeProcessedBlockId(curBlockId, blockId);
-#else
-	COMPARE_EXCHANGE_ATOMIC(*_processedBlockId, curBlockId, blockId);
-#endif
+        // Cancel any in-flight task waiting on this block.
+        storeProcessedBlockId(CompressedOutputStream::CANCEL_TASKS_ID);
 
         if (transform != nullptr)
             delete transform;
