@@ -62,7 +62,7 @@ Notes column says otherwise.
 | [aceapex 1.0](https://github.com/yasha1971-coder/aceapex) | 2026-04-24 | |
 | [brieflz 1.3.0](https://github.com/jibsen/brieflz) | 2020-02-15 | |
 | [brotli 1.2.0](https://github.com/google/brotli) | 2025-10-27 | |
-| [bsc 3.3.11](https://github.com/IlyaGrebnov/libbsc) | 2025-08-14 | Disabled on 32-bit ARM — multithreaded decompress faults (SIGBUS, lzbench#293) |
+| [bsc 3.3.12](https://github.com/IlyaGrebnov/libbsc) | 2025-09-10 | Disabled on 32-bit ARM — multithreaded decompress faults (SIGBUS, lzbench#293) |
 | [bzip2 1.0.8](https://www.sourceware.org/bzip2/downloads.html) | 2019-07-13 | |
 | [bzip3 1.5.3](https://github.com/kspalaiologos/bzip3) | 2025-08-13 | |
 | [crush 1.0](https://sourceforge.net/projects/crush/) | 2013-07-01 | |
@@ -74,34 +74,35 @@ Notes column says otherwise.
 | [libdeflate v1.25](https://github.com/ebiggers/libdeflate) | 2025-11-01 | |
 | [lizard v2.1](https://github.com/inikep/lizard) | 2025-01-26 | |
 | [lz4/lz4hc v1.10.0](https://github.com/lz4/lz4) | 2024-07-21 | |
-| [lzav 5.7](https://github.com/avaneev/lzav) | 2025-12-05 | |
+| [lzav 5.9](https://github.com/avaneev/lzav) | 2026-06-22 | |
 | [lzf 3.6](http://software.schmorp.de/pkg/liblzf.html) | 2014-03-13 | |
 | [lzfse/lzvn 1.0](https://github.com/lzfse/lzfse) | 2017-03-08 | |
 | [lzg 1.0.10](https://github.com/mbitsnbites/liblzg) | 2018-11-29 | |
 | [lzham 1.0](https://github.com/richgel999/lzham_codec) | 2015-01-25 | Disabled on macOS and 32-bit x86 — 64 MB dictionary overflows the 32-bit address space |
 | lzjb 2010 | 2010 | |
-| [lzlib 1.15](http://www.nongnu.org/lzip) | 2025-01-13 | |
+| [lzlib 1.16](https://www.nongnu.org/lzip/lzlib.html) | 2026-03-11 | |
 | [lzma v26.01](http://7-zip.org) | 2026-04-27 | |
 | [lzo 2.10](http://www.oberhumer.com/opensource/lzo) | 2017-03-01 | |
 | [lzsse 2019-04-18 (1847c3e827)](https://github.com/ConorStokes/LZSSE) | 2019-04-18 | 64-bit x86 only — requires SSE4.1 (Windows: MinGW-w64 only); lzsse8fast has a [bug](https://github.com/ConorStokes/LZSSE/issues/14) |
 | [memlz 0.2 beta](https://github.com/rrrlasse/memlz) | 2025-11-03 | Disabled on 32-bit ARM — unaligned access faults (SIGBUS) |
 | [nvcomp 2.2.0](https://github.com/NVIDIA/nvcomp) | 2022-02-07 | CUDA only — built with `make ENABLE_CUDA=1`; not in the default CI matrix |
+| [openzl 0.2.0](https://openzl.org/) | 2026-05-07 | 64-bit only — upstream does not support 32-bit builds |
 | [ppmd8 26.01](http://7-zip.org) | 2026-04-27 | |
 | [quicklz 1.5.1 beta 7](https://web.archive.org/web/20160110073818/https://quicklz.com/) | 2011-10-07 | |
 | [skim 0.1.0](https://github.com/vantorrewannes/skim) | 2026-06-07 | Linux x86-64 and macOS only — requires the [Zig](https://ziglang.org) compiler |
-| [slz 1.2.1](http://www.libslz.org/) | 2022-10-23 | Compressor only; decompresses via zlib |
+| [slz 1.2.2](http://www.libslz.org/) | 2026-04-09 | Compressor only; decompresses via zlib |
 | [snappy 1.2.2](https://github.com/google/snappy) | 2025-03-26 | |
-| [tamp 2.1.0](https://github.com/BrianPugh/tamp) | 2025-03-27 | |
+| [tamp 2.2.4](https://github.com/BrianPugh/tamp) | 2026-06-11 | |
 | [tornado 0.6a](https://encode.su/threads/231-FreeArc-compression-suite-%284x4-Tornado-REP-Delta-Dict-%29) | 2014-03-08 | Disabled on RISC-V (unaligned access) |
 | [ucl 1.03](http://www.oberhumer.com/opensource/ucl/) | 2004-07-20 | |
 | [xz 5.8.3](https://github.com/tukaani-project/xz) | 2026-03-31 | |
 | [yalz77 2022-07-06](https://github.com/ivan-tkatchev/yalz77) | 2022-07-06 | |
 | [zlib 1.3.2](http://zlib.net) | 2026-02-17 | |
-| [zlib-ng 2.2.5](https://github.com/zlib-ng/zlib-ng) | 2025-08-07 | |
+| [zlib-ng 2.3.3](https://github.com/zlib-ng/zlib-ng) | 2026-02-03 | |
 | [zling 2018-10-12](https://github.com/richox/libzling) | 2018-10-12 | Disabled on big-endian PowerPC; not recommended for production use (per author) |
 | [zpaq 7.15](https://github.com/zpaq/zpaq) | 2016-08-17 | Slower on non-x86 — built with `-DNOJIT` (x86-only JIT, portable interpreter elsewhere) |
 | [zstd 1.5.7](https://github.com/facebook/zstd) | 2025-02-19 | |
-| [zxc 0.11.0](https://github.com/hellobertrand/zxc) | 2026-05-13 | |
+| [zxc 0.12.0](https://github.com/hellobertrand/zxc) | 2026-06-18 | |
 
 **Warning**: The compressors listed below have security issues and/or are no longer maintained.
 
