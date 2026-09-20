@@ -843,24 +843,21 @@ ifeq "$(DONT_BUILD_ZXC)" "1"
 else
     DEFINES += -DZXC_STATIC_DEFINE
     ZXC_DIR = lz/zxc/src/lib
-    ZXC_FILES = $(ZXC_DIR)/zxc_common.o $(ZXC_DIR)/zxc_dict.o $(ZXC_DIR)/zxc_dispatch.o $(ZXC_DIR)/zxc_driver.o $(ZXC_DIR)/zxc_pstream.o $(ZXC_DIR)/zxc_seekable.o
+    ZXC_FILES = $(ZXC_DIR)/zxc_common.o $(ZXC_DIR)/zxc_dict.o $(ZXC_DIR)/zxc_dispatch.o $(ZXC_DIR)/zxc_driver.o $(ZXC_DIR)/zxc_pivco_tables.o $(ZXC_DIR)/zxc_pstream.o $(ZXC_DIR)/zxc_seekable.o
     ZXC_FILES += $(ZXC_DIR)/zxc_compress_default.o $(ZXC_DIR)/zxc_decompress_default.o $(ZXC_DIR)/zxc_huffman_default.o
 
     ifneq (,$(filter x86_64% amd64% i%86,$(TARGET_ARCH)))
         ifneq (,$(filter x86_64% amd64%,$(TARGET_ARCH)))
-            ZXC_FILES += $(ZXC_DIR)/zxc_compress_sse2.o $(ZXC_DIR)/zxc_decompress_sse2.o $(ZXC_DIR)/zxc_huffman_sse2.o
             ZXC_FILES += $(ZXC_DIR)/zxc_compress_avx2.o $(ZXC_DIR)/zxc_decompress_avx2.o $(ZXC_DIR)/zxc_huffman_avx2.o
             ZXC_FILES += $(ZXC_DIR)/zxc_compress_avx512.o $(ZXC_DIR)/zxc_decompress_avx512.o $(ZXC_DIR)/zxc_huffman_avx512.o
         endif
     endif
 
+    # 32-bit ARM only (AArch64's NEON tier is _default).
     ifneq (,$(filter arm% aarch64%,$(TARGET_ARCH)))
-        ZXC_FILES += $(ZXC_DIR)/zxc_compress_neon.o $(ZXC_DIR)/zxc_decompress_neon.o $(ZXC_DIR)/zxc_huffman_neon.o
-
-        ifneq (,$(filter arm64% aarch64%,$(TARGET_ARCH)))
-            NEON_FLAGS = -DZXC_USE_NEON64
-        else
-            NEON_FLAGS = -march=armv7-a -mfloat-abi=softfp -mfpu=neon -DZXC_USE_NEON32
+        ifeq (,$(filter arm64% aarch64%,$(TARGET_ARCH)))
+            ZXC_FILES += $(ZXC_DIR)/zxc_compress_neon32.o $(ZXC_DIR)/zxc_decompress_neon32.o $(ZXC_DIR)/zxc_huffman_neon32.o
+            NEON_FLAGS = -march=armv7-a -mfpu=neon
         endif
     endif
 
@@ -868,24 +865,61 @@ else
 
     $(ZXC_DIR)/%.o: $(ZXC_DIR)/%.c ; $(CMD_BUILD_ZXC)
 
-    ifneq (,$(filter x86_64% amd64%,$(TARGET_ARCH)))
-        $(ZXC_DIR)/%_default.o: ZXC_FLAGS = -mbmi -mbmi2 -mlzcnt -DZXC_FUNCTION_SUFFIX=_default
-    else
-        $(ZXC_DIR)/%_default.o: ZXC_FLAGS = -DZXC_FUNCTION_SUFFIX=_default
-    endif
+    $(ZXC_DIR)/%_default.o: ZXC_FLAGS = -DZXC_FUNCTION_SUFFIX=_default
     $(ZXC_DIR)/%_default.o: $(ZXC_DIR)/%.c ; $(CMD_BUILD_ZXC)
 
-    $(ZXC_DIR)/%_sse2.o: ZXC_FLAGS = -msse2 -DZXC_FUNCTION_SUFFIX=_sse2 -DZXC_USE_SSE2
-    $(ZXC_DIR)/%_sse2.o: $(ZXC_DIR)/%.c ; $(CMD_BUILD_ZXC)
-
-    $(ZXC_DIR)/%_avx2.o: ZXC_FLAGS = -mavx2 -mbmi -mbmi2 -mlzcnt -DZXC_FUNCTION_SUFFIX=_avx2 -DZXC_USE_AVX2
+    $(ZXC_DIR)/%_avx2.o: ZXC_FLAGS = -mavx2 -mbmi -mbmi2 -mlzcnt -mno-avx512f -DZXC_FUNCTION_SUFFIX=_avx2 -DZXC_USE_AVX2
     $(ZXC_DIR)/%_avx2.o: $(ZXC_DIR)/%.c ; $(CMD_BUILD_ZXC)
 
-    $(ZXC_DIR)/%_avx512.o: ZXC_FLAGS = -mavx512f -mavx512bw -mbmi -mbmi2 -mlzcnt -DZXC_FUNCTION_SUFFIX=_avx512 -DZXC_USE_AVX512
+    $(ZXC_DIR)/%_avx512.o: ZXC_FLAGS = -mavx512f -mavx512bw -mavx512vbmi -mavx512vbmi2 -mbmi -mbmi2 -mlzcnt -DZXC_FUNCTION_SUFFIX=_avx512 -DZXC_USE_AVX512
     $(ZXC_DIR)/%_avx512.o: $(ZXC_DIR)/%.c ; $(CMD_BUILD_ZXC)
 
-    $(ZXC_DIR)/%_neon.o: ZXC_FLAGS = $(NEON_FLAGS) -DZXC_FUNCTION_SUFFIX=_neon
-    $(ZXC_DIR)/%_neon.o: $(ZXC_DIR)/%.c ; $(CMD_BUILD_ZXC)
+    $(ZXC_DIR)/%_neon32.o: ZXC_FLAGS = $(NEON_FLAGS) -DZXC_FUNCTION_SUFFIX=_neon32
+    $(ZXC_DIR)/%_neon32.o: $(ZXC_DIR)/%.c ; $(CMD_BUILD_ZXC)
+endif
+
+
+# misa77 targets 64-bit little-endian systems and needs C++20.
+# The probe is skipped when misa77 is already disabled with DONT_BUILD_MISA77=1.
+ifneq ($(DONT_BUILD_MISA77),1)
+    MISA77_OK := $(shell printf 'int main(){static_assert(__BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__);static_assert(sizeof(void*)==8);return 0;}' | $(CXX) $(CODE_FLAGS) -std=c++20 -fsyntax-only -x c++ - 2>/dev/null && echo ok)
+    ifneq ($(MISA77_OK),ok)
+        DONT_BUILD_MISA77 ?= 1
+        ifeq "$(DONT_BUILD_MISA77)" "1"
+            $(info C++20 and a 64-bit little-endian target required – skipping misa77 build)
+        endif
+    endif
+endif
+
+ifeq "$(DONT_BUILD_MISA77)" "1"
+    DEFINES += -DBENCH_REMOVE_MISA77
+else
+    MISA77_DIR = lz/misa77
+    MISA77_INC = -I$(MISA77_DIR)/include -I$(MISA77_DIR)/src
+    # always built:
+    MISA77_FILES  = $(MISA77_DIR)/src/compress.o $(MISA77_DIR)/src/decompress.o
+    MISA77_FILES += $(MISA77_DIR)/src/isa/target_portable.o
+
+    # 64-bit x86 only (the probe above already rejected 32-bit and big-endian targets):
+    ifneq (,$(filter x86_64% amd64%,$(TARGET_ARCH)))
+        MISA77_FILES += $(MISA77_DIR)/src/isa/target_sse2.o $(MISA77_DIR)/src/isa/target_avx2.o
+    endif
+    # 64-bit ARM only:
+    ifneq (,$(filter arm64% aarch64%,$(TARGET_ARCH)))
+        MISA77_FILES += $(MISA77_DIR)/src/isa/target_neon.o
+    endif
+
+    CMD_BUILD_MISA77 = @$(MKDIR) $(dir $@) && $(CXX) $(CXXFLAGS) -std=c++20 $(MISA77_INC) $(MISA77_FLAGS) $< -c -o $@
+
+    # target_avx2.cpp is the only TU needing extra ISA flags: SSE2 and NEON are baseline on
+    # 64-bit x86 and ARM, and the probe above already disabled misa77 on 32-bit targets. A
+    # 32-bit x86 port would have to add -msse2 back for target_sse2.cpp, as i686 has neither
+    # __SSE__ nor __SSE2__ by default.
+    # A pattern-specific variable applies to every target matching the pattern, so -mavx2
+    # reaches target_avx2.o through the generic rule below.
+    $(MISA77_DIR)/%_avx2.o: MISA77_FLAGS = -mavx2
+
+    $(MISA77_DIR)/%.o: $(MISA77_DIR)/%.cpp ; $(CMD_BUILD_MISA77)
 endif
 
 # Symmetric codecs
@@ -1016,19 +1050,43 @@ ifeq "$(ENABLE_CUDA)" "1"
   # CUDA-based codecs
   CUDA_BASE ?= /usr/local/cuda
   LIBCUDART=$(wildcard $(CUDA_BASE)/lib64/libcudart.so)
+  CUDA_H=$(wildcard $(CUDA_BASE)/include/cuda.h)
 
-  ifeq "$(LIBCUDART)" ""
+  ifeq "$(and $(LIBCUDART),$(CUDA_H))" ""
     $(info CUDA Toolkit not found at $(CUDA_BASE), CUDA support will be disabled.)
     $(info Run "make CUDA_BASE=..." to use a different path.)
     CUDA_BASE =
     LIBCUDART =
+    CUDA_H =
   else
     DEFINES += -DBENCH_HAS_CUDA -I$(CUDA_BASE)/include
     LDFLAGS += -L$(CUDA_BASE)/lib64 -lcudart -Wl,-rpath=$(CUDA_BASE)/lib64
     CUDA_COMPILER = nvcc
     CUDA_CC = $(CUDA_BASE)/bin/nvcc --compiler-bindir $(CXX)
-    CUDA_ARCH = 50 52 60 61 70 75 80 86 89
-    CUDA_CXXFLAGS = -x cu -std=c++14 -O3 $(foreach ARCH, $(CUDA_ARCH), --generate-code=arch=compute_$(ARCH),code=[compute_$(ARCH),sm_$(ARCH)]) --expt-extended-lambda -forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets
+    CUDA_VERSION := $(shell awk '$$1 == "#define" && $$2 == "CUDA_VERSION" { print $$3; exit;}' $(CUDA_H))
+    ifeq "$(CUDA_VERSION)" ""
+      $(error Could not determine CUDA_VERSION from $(CUDA_H))
+    endif
+    CUDA_ARCH := $(shell \
+      if [ $(CUDA_VERSION) -ge 13000 ]; then \
+	  echo 75 80 86 89 90 100 120; \
+      elif [ $(CUDA_VERSION) -ge 12080 ]; then \
+	  echo 50 52 60 61 70 75 80 86 89 90 100 120; \
+      elif [ $(CUDA_VERSION) -ge 11080 ]; then \
+	  echo 50 52 60 61 70 75 80 86 89 90; \
+      elif [ $(CUDA_VERSION) -ge 11010 ]; then \
+	  echo 50 52 60 61 70 75 80 86; \
+      elif [ $(CUDA_VERSION) -ge 11000 ]; then \
+	  echo 50 52 60 61 70 75 80; \
+      else \
+	  echo 50 52 60 61 70 75; fi)
+    CUDA_CXXSTD := $(shell \
+      if [ $(CUDA_VERSION) -ge 13000 ]; then \
+	  echo c++17; \
+      else \
+	  echo c++14; \
+      fi)
+    CUDA_CXXFLAGS = -x cu -std=$(CUDA_CXXSTD) -O3 $(foreach ARCH, $(CUDA_ARCH), --generate-code=arch=compute_$(ARCH),code=[compute_$(ARCH),sm_$(ARCH)]) --expt-extended-lambda -forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets
 
     ACEAPEX_CUDA_FILES = lz/aceapex/cuda/aceapex_cuda.cu.o lz/aceapex/cuda/aceapex_cuda_lzbench.o
 
@@ -1045,13 +1103,13 @@ ifeq "$(ENABLE_CUDA)" "1"
     BSC_FLAGS += -DLIBBSC_CUDA_SUPPORT
     BSC_CUDA_FILES = bwt/libbsc/libbsc/bwt/libcubwt/libcubwt.cu.o bwt/libbsc/libbsc/st/st.cu.o
   endif
-  endif # ifneq "$(LIBCUDART)"
+  endif # ifeq "$(and $(LIBCUDART),$(CUDA_H))"
 endif # ifeq "$(ENABLE_CUDA)"
 
 
 MKDIR = mkdir -p
 
-lzbench: $(BUGGY_C_FILES) $(BUGGY_CC_FILES) $(BUGGY_CXX_FILES) $(ACEAPEX_FILES) $(BSC_C_FILES) $(BSC_CXX_FILES) $(BSC_CUDA_FILES) $(ACEAPEX_CUDA_FILES) $(BZIP2_FILES) $(BZIP3_FILES) $(CSC_FILES) $(KANZI_FILES) $(FASTLZMA2_OBJ) $(ZSTD_FILES) $(LZSSE_FILES) $(LZFSE_FILES) $(XZ_FILES) $(LIBLZG_FILES) $(BRIEFLZ_FILES) $(LZF_FILES) $(BROTLI_FILES) $(LZMA_FILES) $(ZLING_FILES) $(QUICKLZ_FILES) $(OPENZL_C_FILES) $(OPENZL_S_FILES) $(SNAPPY_FILES) $(ZLIB_FILES) $(ZLIB_NG_FILES) $(LZHAM_FILES) $(LZO_FILES) $(UCL_FILES) $(LZ4_FILES) $(LIZARD_FILES) $(LIBDEFLATE_FILES) $(ZXC_FILES) $(MISC_FILES) $(NVCOMP_FILES) $(PPMD_FILES) $(BENCH_FILES) $(SKIM_FILE)
+lzbench: $(BUGGY_C_FILES) $(BUGGY_CC_FILES) $(BUGGY_CXX_FILES) $(ACEAPEX_FILES) $(BSC_C_FILES) $(BSC_CXX_FILES) $(BSC_CUDA_FILES) $(ACEAPEX_CUDA_FILES) $(BZIP2_FILES) $(BZIP3_FILES) $(CSC_FILES) $(KANZI_FILES) $(FASTLZMA2_OBJ) $(ZSTD_FILES) $(LZSSE_FILES) $(LZFSE_FILES) $(XZ_FILES) $(LIBLZG_FILES) $(BRIEFLZ_FILES) $(LZF_FILES) $(BROTLI_FILES) $(LZMA_FILES) $(ZLING_FILES) $(QUICKLZ_FILES) $(OPENZL_C_FILES) $(OPENZL_S_FILES) $(SNAPPY_FILES) $(ZLIB_FILES) $(ZLIB_NG_FILES) $(LZHAM_FILES) $(LZO_FILES) $(UCL_FILES) $(LZ4_FILES) $(LIZARD_FILES) $(LIBDEFLATE_FILES) $(ZXC_FILES) $(MISA77_FILES) $(MISC_FILES) $(NVCOMP_FILES) $(PPMD_FILES) $(BENCH_FILES) $(SKIM_FILE)
 	$(CXX) $^ -o $@ $(LDFLAGS)
 	@echo Linked GCC_VERSION=$(GCC_VERSION) CLANG_VERSION=$(CLANG_VERSION) COMPILER=$(COMPILER)
 
@@ -1123,7 +1181,7 @@ $(LIZARD_FILES): %.o : %.c
 
 $(LZ_CODECS): %.o : %.cpp
 	@$(MKDIR) $(dir $@)
-	$(CXX) $(CXXFLAGS) -Ilz -Ilz/brotli/include -Ilz/openzl/include -Ilz/zxc/src/lib/vendors $< -c -o $@
+	$(CXX) $(CXXFLAGS) -Ilz -Ilz/brotli/include -Ilz/openzl/include -Ilz/zxc/src/lib/vendors -Ilz/misa77/include $< -c -o $@
 
 $(LZHAM_FILES): %.o : %.cpp
 	@$(MKDIR) $(dir $@)

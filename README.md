@@ -74,7 +74,7 @@ Notes column says otherwise.
 | [libdeflate v1.25](https://github.com/ebiggers/libdeflate) | 2025-11-01 | |
 | [lizard v2.1](https://github.com/inikep/lizard) | 2025-01-26 | |
 | [lz4/lz4hc v1.10.0](https://github.com/lz4/lz4) | 2024-07-21 | |
-| [lzav 5.9](https://github.com/avaneev/lzav) | 2026-06-22 | |
+| [lzav 5.16](https://github.com/avaneev/lzav) | 2026-07-21 | |
 | [lzf 3.6](http://software.schmorp.de/pkg/liblzf.html) | 2014-03-13 | |
 | [lzfse/lzvn 1.0](https://github.com/lzfse/lzfse) | 2017-03-08 | |
 | [lzg 1.0.10](https://github.com/mbitsnbites/liblzg) | 2018-11-29 | |
@@ -85,6 +85,7 @@ Notes column says otherwise.
 | [lzo 2.10](http://www.oberhumer.com/opensource/lzo) | 2017-03-01 | |
 | [lzsse 2019-04-18 (1847c3e827)](https://github.com/ConorStokes/LZSSE) | 2019-04-18 | 64-bit x86 only — requires SSE4.1 (Windows: MinGW-w64 only); lzsse8fast has a [bug](https://github.com/ConorStokes/LZSSE/issues/14) |
 | [memlz 0.2 beta](https://github.com/rrrlasse/memlz) | 2025-11-03 | Disabled on 32-bit ARM — unaligned access faults (SIGBUS) |
+| [misa77 0.6.0](https://github.com/welcome-to-the-sunny-side/misa77) | 2026-07-30 | Little-endian 64-bit only — needs a C++20 compiler (GCC 10+, Clang 12+); skipped automatically |
 | [nvcomp 2.2.0](https://github.com/NVIDIA/nvcomp) | 2022-02-07 | CUDA only — built with `make ENABLE_CUDA=1`; not in the default CI matrix |
 | [openzl 0.2.0](https://openzl.org/) | 2026-05-07 | 64-bit only — upstream does not support 32-bit builds |
 | [ppmd8 26.01](http://7-zip.org) | 2026-04-27 | |
@@ -102,7 +103,7 @@ Notes column says otherwise.
 | [zling 2018-10-12](https://github.com/richox/libzling) | 2018-10-12 | Disabled on big-endian PowerPC; not recommended for production use (per author) |
 | [zpaq 7.15](https://github.com/zpaq/zpaq) | 2016-08-17 | Slower on non-x86 — built with `-DNOJIT` (x86-only JIT, portable interpreter elsewhere) |
 | [zstd 1.5.7](https://github.com/facebook/zstd) | 2025-02-19 | |
-| [zxc 0.12.0](https://github.com/hellobertrand/zxc) | 2026-06-18 | |
+| [zxc 0.13.1](https://github.com/hellobertrand/zxc) | 2026-07-15 | |
 
 **Warning**: The compressors listed below have security issues and/or are no longer maintained.
 

@@ -57,6 +57,33 @@ int64_t lzbench_memlz_decompress(char* inbuf, size_t insize, char* outbuf, size_
 
 
 
+#ifndef BENCH_REMOVE_MISA77
+#include "misa77/misa77.h"
+
+int64_t lzbench_misa77_compress(char* inbuf, size_t insize, char* outbuf, size_t outsize, codec_options_t* codec_options)
+{
+    // Levels run -1..4 and are monotone in ratio and (inversely) in compression speed:
+    // -1 and 0 = fast compression, 1 = fastest decompression (the library default),
+    // 2 = better ratio, 3 = optimal parse, 4 = "heavy" format (best ratio, slowest compression).
+    return (int64_t)misa77::compress((const uint8_t*)inbuf, insize, (uint8_t*)outbuf, outsize, misa77::config((int8_t)codec_options->level));
+}
+
+// The decompressor detects the format (light for levels -1..3, heavy for level 4) from the
+// stream itself. misa77_safe stops at level 3 because the heavy format has no safe decoder
+// yet (misa77::decompress with dconfig(true) rejects heavy streams by returning 0).
+int64_t lzbench_misa77_decompress(char* inbuf, size_t insize, char* outbuf, size_t outsize, codec_options_t* codec_options)
+{
+    return (int64_t)misa77::decompress((const uint8_t*)inbuf, insize, (uint8_t*)outbuf, outsize);
+}
+
+int64_t lzbench_misa77_safe_decompress(char* inbuf, size_t insize, char* outbuf, size_t outsize, codec_options_t* codec_options)
+{
+    return (int64_t)misa77::decompress((const uint8_t*)inbuf, insize, (uint8_t*)outbuf, outsize, misa77::dconfig(true));
+}
+#endif // BENCH_REMOVE_MISA77
+
+
+
 #ifndef BENCH_REMOVE_BRIEFLZ
 #include "lz/brieflz/brieflz.h"
 
@@ -1708,6 +1735,10 @@ char* lzbench_openzl_init_zstd(size_t insize, size_t level, size_t windowLog)
       abort();
     }
 
+    // OpenZL does not validate the compression level; it is forwarded to zstd, which
+    // clamps it to [ZSTD_minCLevel(), ZSTD_maxCLevel()], i.e. [-131072, 22].
+    // Level 0 requests the default behaviour, which corresponds to level 6.
+    // lzbench limits the range to [-99, 22]; -99 is an arbitrary practical floor.
     report = ZL_Compressor_setParameter(params->cgraph, ZL_CParam_compressionLevel, level);
     if (ZL_isError(report)) {
       printf("OpenZL initialisation error: %s\n", ZL_Compressor_getErrorContextString(params->cgraph, report));
@@ -1728,6 +1759,12 @@ char* lzbench_openzl_init_lz4(size_t insize, size_t level, size_t windowLog)
       abort();
     }
 
+    // OpenZL does not validate the compression level: the lz4 graph maps levels <= 1 to
+    // LZ4_compress_fast() with acceleration = 1 - level (lz4 clamps the acceleration to
+    // LZ4_ACCELERATION_MAX, i.e. 65537), and levels >= 2 to LZ4_compress_HC(), whose
+    // maximum is LZ4HC_CLEVEL_MAX, i.e. 12.
+    // Level 0 requests the default behaviour, which corresponds to level 6.
+    // lzbench limits the range to [-99, 12]; -99 is an arbitrary practical floor.
     report = ZL_Compressor_setParameter(params->cgraph, ZL_CParam_compressionLevel, level);
     if (ZL_isError(report)) {
       printf("OpenZL initialisation error: %s\n", ZL_Compressor_getErrorContextString(params->cgraph, report));
