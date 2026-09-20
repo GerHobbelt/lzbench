@@ -558,8 +558,17 @@ void lzbench_process_single_codec(ThreadPool& pool, int numThreads, lzbench_para
 
     if (desc->init) {
         for (int i = 0; i < numThreads; i++) {
-            if (desc->init) {
-                workmems[i] = desc->init(effective_max_chunk_size, param1, param2);
+            workmems[i] = desc->init(effective_max_chunk_size, param1, param2);
+            if (!workmems[i]) {
+                // init() failed: out of memory, no CUDA device at runtime, etc.
+                // Most codecs dereference work_mem unconditionally, so skip the
+                // codec instead of benchmarking it with a NULL work_mem (that
+                // used to SEGFAULT, e.g. "lzbench -eCUDA" on a host without a GPU).
+                LZBENCH_PRINT(0, "ERROR in %s: initialization failed\n", desc->name);
+                if (desc->deinit) {
+                    for (int j = 0; j < i; j++) desc->deinit(workmems[j]);
+                }
+                return;
             }
         }
     }
@@ -819,6 +828,8 @@ void lzbench_process_mem_blocks(lzbench_params_t *params, size_t max_chunk_size,
     if (!compbuf || !decomp)
     {
         printf("Not enough memory, please use -m option!\n");
+        free(compbuf);
+        free(decomp);
         g_exit_result = 3;
         return;
     }
@@ -968,6 +979,8 @@ int lzbench_main(lzbench_params_t* params, const char** inFileNames, unsigned if
 
         if (insize == 0) {
             LZBENCH_PRINT(2, "[Warning] File %s is empty and will be ignored\n", inFileNames[i]);
+            fclose(in);
+            free(inbuf);
             continue;
         }
 
@@ -1239,7 +1252,12 @@ int main( int argc, char** argv)
             printf("Available compressors for -e option:\n");
             for (int i=0; i<LZBENCH_COMPRESSOR_COUNT; i++)
             {
-                if (comp_desc[i].compress)
+                // Same condition as lzbench_process_single_codec(): a codec that
+                // is missing either half is not built in and cannot be run, so
+                // don't advertise it. Both halves matter because a codec can
+                // have one of them compiled out on its own (aceapex_cuda shares
+                // the CPU compressor but has a CUDA-only decompressor).
+                if (comp_desc[i].compress && comp_desc[i].decompress)
                 {
                     if (comp_desc[i].first_level < comp_desc[i].last_level)
                         printf("%s = %s; levels=[%d-%d]", comp_desc[i].name, comp_desc[i].name_version, comp_desc[i].first_level, comp_desc[i].last_level);

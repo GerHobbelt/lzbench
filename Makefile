@@ -80,6 +80,12 @@ else
         MOREFLAGS += -mno-strict-align
     endif
 
+    # some compressors use dlopen(), which requires linking with -ldl on glibc
+    # 2.33 and older, and other libc libraries.
+    # GNU Make 3.8.x fails to parse \# inside the $(shell ...) function.
+    LIBDL_TEST_SRC := \#include <dlfcn.h>\nint main(){dlopen(0,0);return 0;}\n
+    LIBDL := $(shell printf '${LIBDL_TEST_SRC}' | $(CXX) -x c - -o /dev/null 2>/dev/null && echo "" || echo "-ldl")
+
     # detect MacOS
     detected_OS := $(shell uname -s)
     ifeq ($(detected_OS), Darwin)
@@ -561,6 +567,15 @@ else
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/partition/encode_partition_binding.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/partition/encode_partition_bitpack.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/partition/encode_partition_kernel.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/pivco_huffman/arch/decode_pivco_arch.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/pivco_huffman/arch/decode_pivco_avx512.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/pivco_huffman/arch/encode_pivco_arch.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/pivco_huffman/arch/encode_pivco_avx512.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/pivco_huffman/common_pivco_kernel.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/pivco_huffman/decode_pivco_binding.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/pivco_huffman/decode_pivco_kernel.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/pivco_huffman/encode_pivco_binding.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/pivco_huffman/encode_pivco_kernel.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/prefix/decode_prefix_binding.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/prefix/decode_prefix_kernel.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/prefix/encode_prefix_binding.o
@@ -589,6 +604,10 @@ else
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/sentinel/decode_sentinel_kernel.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/sentinel/encode_sentinel_binding.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/sentinel/encode_sentinel_kernel.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/sparse_num/decode_sparse_num_binding.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/sparse_num/decode_sparse_num_kernel.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/sparse_num/encode_sparse_num_binding.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/sparse_num/encode_sparse_num_kernel.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/splitByStruct/decode_splitByStruct_binding.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/splitByStruct/decode_splitByStruct_kernel.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/splitByStruct/encode_splitByStruct_binding.o
@@ -616,6 +635,7 @@ else
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/zigzag/decode_zigzag_kernel.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/zigzag/encode_zigzag_binding.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/zigzag/encode_zigzag_kernel.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/codecs/zstd/common_zstd.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/zstd/decode_zstd_binding.o
     OPENZL_C_FILES += lz/openzl/src/openzl/codecs/zstd/encode_zstd_binding.o
     OPENZL_C_FILES += lz/openzl/src/openzl/common/a1cbor_helpers.o
@@ -623,6 +643,7 @@ else
     OPENZL_C_FILES += lz/openzl/src/openzl/common/errors.o
     OPENZL_C_FILES += lz/openzl/src/openzl/common/limits.o
     OPENZL_C_FILES += lz/openzl/src/openzl/common/logging.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/common/materializer_ctx.o
     OPENZL_C_FILES += lz/openzl/src/openzl/common/opaque.o
     OPENZL_C_FILES += lz/openzl/src/openzl/common/operation_context.o
     OPENZL_C_FILES += lz/openzl/src/openzl/common/refcount.o
@@ -655,7 +676,6 @@ else
     OPENZL_C_FILES += lz/openzl/src/openzl/compress/graphs/split_graph.o
     OPENZL_C_FILES += lz/openzl/src/openzl/compress/implicit_conversion.o
     OPENZL_C_FILES += lz/openzl/src/openzl/compress/localparams.o
-    OPENZL_C_FILES += lz/openzl/src/openzl/compress/materializer.o
     OPENZL_C_FILES += lz/openzl/src/openzl/compress/name.o
     OPENZL_C_FILES += lz/openzl/src/openzl/compress/nodemgr.o
     OPENZL_C_FILES += lz/openzl/src/openzl/compress/rtgraphs.o
@@ -684,7 +704,8 @@ else
     OPENZL_C_FILES += lz/openzl/src/openzl/decompress/reflection.o
     OPENZL_C_FILES += lz/openzl/src/openzl/dict/bundle.o
     OPENZL_C_FILES += lz/openzl/src/openzl/dict/dict.o
-    OPENZL_C_FILES += lz/openzl/src/openzl/dict/materializer_ctx.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/dict/dictloader.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/dict/fatbundle_dictloader.o
     OPENZL_C_FILES += lz/openzl/src/openzl/fse/common/debug.o
     OPENZL_C_FILES += lz/openzl/src/openzl/fse/common/entropy_common.o
     OPENZL_C_FILES += lz/openzl/src/openzl/fse/common/error_private.o
@@ -694,6 +715,7 @@ else
     OPENZL_C_FILES += lz/openzl/src/openzl/fse/decompress/fse_decompress.o
     OPENZL_C_FILES += lz/openzl/src/openzl/fse/decompress/huf_decompress.o
     OPENZL_C_FILES += lz/openzl/src/openzl/shared/a1cbor.o
+    OPENZL_C_FILES += lz/openzl/src/openzl/shared/base64.o
     OPENZL_C_FILES += lz/openzl/src/openzl/shared/clustering_common.o
     OPENZL_C_FILES += lz/openzl/src/openzl/shared/clustering_compress.o
     OPENZL_C_FILES += lz/openzl/src/openzl/shared/data_stats.o
@@ -939,6 +961,8 @@ else
     BSC_CXX_FILES += bwt/libbsc/libbsc/lzp/lzp.o
     BSC_CXX_FILES += bwt/libbsc/libbsc/platform/platform.o
     BSC_CXX_FILES += bwt/libbsc/libbsc/st/st.o
+
+    LDFLAGS_LIBDL  = $(LIBDL)
 endif
 
 
@@ -1090,6 +1114,12 @@ ifeq "$(ENABLE_CUDA)" "1"
 
     ACEAPEX_CUDA_FILES = lz/aceapex/cuda/aceapex_cuda.cu.o lz/aceapex/cuda/aceapex_cuda_lzbench.o
 
+  ifeq "$(DONT_BUILD_GPUCOMPACT)" "1"
+    DEFINES += -DBENCH_REMOVE_GPUCOMPACT
+  else
+    GPUCOMPACT_FILES = lz/gpucompact/kernels.cu.o lz/gpucompact/context.cu.o lz/gpucompact/gpucompact_lzbench.o
+  endif
+
   ifneq "$(DONT_BUILD_NVCOMP)" "1"
     DEFINES += -DBENCH_HAS_NVCOMP
     NVCOMP_CPP_SRC = $(wildcard misc/nvcomp/src/*.cpp misc/nvcomp/src/lowlevel/*.cpp)
@@ -1097,6 +1127,7 @@ ifeq "$(ENABLE_CUDA)" "1"
     NVCOMP_CU_SRC  = $(wildcard misc/nvcomp/src/*.cu misc/nvcomp/src/lowlevel/*.cu)
     NVCOMP_CU_OBJ  = $(NVCOMP_CU_SRC:%=%.o)
     NVCOMP_FILES   = $(NVCOMP_CU_OBJ) $(NVCOMP_CPP_OBJ)
+    LDFLAGS_LIBDL  = $(LIBDL)
   endif
 
   ifneq "$(DONT_BUILD_BSC)" "1"
@@ -1109,8 +1140,8 @@ endif # ifeq "$(ENABLE_CUDA)"
 
 MKDIR = mkdir -p
 
-lzbench: $(BUGGY_C_FILES) $(BUGGY_CC_FILES) $(BUGGY_CXX_FILES) $(ACEAPEX_FILES) $(BSC_C_FILES) $(BSC_CXX_FILES) $(BSC_CUDA_FILES) $(ACEAPEX_CUDA_FILES) $(BZIP2_FILES) $(BZIP3_FILES) $(CSC_FILES) $(KANZI_FILES) $(FASTLZMA2_OBJ) $(ZSTD_FILES) $(LZSSE_FILES) $(LZFSE_FILES) $(XZ_FILES) $(LIBLZG_FILES) $(BRIEFLZ_FILES) $(LZF_FILES) $(BROTLI_FILES) $(LZMA_FILES) $(ZLING_FILES) $(QUICKLZ_FILES) $(OPENZL_C_FILES) $(OPENZL_S_FILES) $(SNAPPY_FILES) $(ZLIB_FILES) $(ZLIB_NG_FILES) $(LZHAM_FILES) $(LZO_FILES) $(UCL_FILES) $(LZ4_FILES) $(LIZARD_FILES) $(LIBDEFLATE_FILES) $(ZXC_FILES) $(MISA77_FILES) $(MISC_FILES) $(NVCOMP_FILES) $(PPMD_FILES) $(BENCH_FILES) $(SKIM_FILE)
-	$(CXX) $^ -o $@ $(LDFLAGS)
+lzbench: $(BUGGY_C_FILES) $(BUGGY_CC_FILES) $(BUGGY_CXX_FILES) $(ACEAPEX_FILES) $(BSC_C_FILES) $(BSC_CXX_FILES) $(BSC_CUDA_FILES) $(ACEAPEX_CUDA_FILES) $(GPUCOMPACT_FILES) $(BZIP2_FILES) $(BZIP3_FILES) $(CSC_FILES) $(KANZI_FILES) $(FASTLZMA2_OBJ) $(ZSTD_FILES) $(LZSSE_FILES) $(LZFSE_FILES) $(XZ_FILES) $(LIBLZG_FILES) $(BRIEFLZ_FILES) $(LZF_FILES) $(BROTLI_FILES) $(LZMA_FILES) $(ZLING_FILES) $(QUICKLZ_FILES) $(OPENZL_C_FILES) $(OPENZL_S_FILES) $(SNAPPY_FILES) $(ZLIB_FILES) $(ZLIB_NG_FILES) $(LZHAM_FILES) $(LZO_FILES) $(UCL_FILES) $(LZ4_FILES) $(LIZARD_FILES) $(LIBDEFLATE_FILES) $(ZXC_FILES) $(MISA77_FILES) $(MISC_FILES) $(NVCOMP_FILES) $(PPMD_FILES) $(BENCH_FILES) $(SKIM_FILE)
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDFLAGS_LIBDL)
 	@echo Linked GCC_VERSION=$(GCC_VERSION) CLANG_VERSION=$(CLANG_VERSION) COMPILER=$(COMPILER)
 
 $(BENCH_MAIN): bench/lzbench.cpp bench/lzbench.h bench/threadpool.h bench/codecs.h DENSITY_LIB
@@ -1263,6 +1294,15 @@ lz/aceapex/cuda/aceapex_cuda.cu.o: lz/aceapex/cuda/aceapex_cuda.cu
 	$(CUDA_CC) $(CUDA_CXXFLAGS) $(CXXFLAGS) -c $< -o $@
 
 lz/aceapex/cuda/aceapex_cuda_lzbench.o: lz/aceapex/cuda/aceapex_cuda_lzbench.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# GPUCOMPACT CUDA compressor
+lz/gpucompact/%.cu.o: lz/gpucompact/%.cu
+	@$(MKDIR) $(dir $@)
+	$(CUDA_CC) $(CUDA_CXXFLAGS) $(CXXFLAGS) -c $< -o $@
+
+lz/gpucompact/gpucompact_lzbench.o: lz/gpucompact/gpucompact_lzbench.cpp
+	@$(MKDIR) $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(BSC_CUDA_FILES): %.cu.o: %.cu

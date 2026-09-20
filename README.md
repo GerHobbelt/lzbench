@@ -59,7 +59,7 @@ Notes column says otherwise.
 
 | Compressor | Last update | Notes |
 | :--- | :--- | :--- |
-| [aceapex 1.0](https://github.com/yasha1971-coder/aceapex) | 2026-04-24 | |
+| [aceapex 1.0.1](https://github.com/yasha1971-coder/aceapex) | 2026-07-30 | |
 | [brieflz 1.3.0](https://github.com/jibsen/brieflz) | 2020-02-15 | |
 | [brotli 1.2.0](https://github.com/google/brotli) | 2025-10-27 | |
 | [bsc 3.3.12](https://github.com/IlyaGrebnov/libbsc) | 2025-09-10 | Disabled on 32-bit ARM — multithreaded decompress faults (SIGBUS, lzbench#293) |
@@ -70,6 +70,7 @@ Notes column says otherwise.
 | [fastlz 0.5.0](https://github.com/ariya/FastLZ) | 2020-02-02 | |
 | [fast-lzma2 1.0.1](https://github.com/conor42/fast-lzma2) | 2019-05-06 | |
 | [glza 0.12](https://encode.su/threads/2427-GLZA) | 2026-03-23 | |
+| [gpucompact 1.0](https://github.com/UDPSendToFailed/gpucompact) | 2026-07-27 | CUDA only |
 | [kanzi 2.5.3](https://github.com/flanglet/kanzi-cpp) | 2026-04-22 | |
 | [libdeflate v1.25](https://github.com/ebiggers/libdeflate) | 2025-11-01 | |
 | [lizard v2.1](https://github.com/inikep/lizard) | 2025-01-26 | |
@@ -87,7 +88,7 @@ Notes column says otherwise.
 | [memlz 0.2 beta](https://github.com/rrrlasse/memlz) | 2025-11-03 | Disabled on 32-bit ARM — unaligned access faults (SIGBUS) |
 | [misa77 0.6.0](https://github.com/welcome-to-the-sunny-side/misa77) | 2026-07-30 | Little-endian 64-bit only — needs a C++20 compiler (GCC 10+, Clang 12+); skipped automatically |
 | [nvcomp 2.2.0](https://github.com/NVIDIA/nvcomp) | 2022-02-07 | CUDA only — built with `make ENABLE_CUDA=1`; not in the default CI matrix |
-| [openzl 0.2.0](https://openzl.org/) | 2026-05-07 | 64-bit only — upstream does not support 32-bit builds |
+| [openzl 0.2.3](https://openzl.org/) | 2026-07-28 | 64-bit only — upstream does not support 32-bit builds |
 | [ppmd8 26.01](http://7-zip.org) | 2026-04-27 | |
 | [quicklz 1.5.1 beta 7](https://web.archive.org/web/20160110073818/https://quicklz.com/) | 2011-10-07 | |
 | [skim 0.1.0](https://github.com/vantorrewannes/skim) | 2026-06-07 | Linux x86-64 and macOS only — requires the [Zig](https://ziglang.org) compiler |
@@ -103,7 +104,7 @@ Notes column says otherwise.
 | [zling 2018-10-12](https://github.com/richox/libzling) | 2018-10-12 | Disabled on big-endian PowerPC; not recommended for production use (per author) |
 | [zpaq 7.15](https://github.com/zpaq/zpaq) | 2016-08-17 | Slower on non-x86 — built with `-DNOJIT` (x86-only JIT, portable interpreter elsewhere) |
 | [zstd 1.5.7](https://github.com/facebook/zstd) | 2025-02-19 | |
-| [zxc 0.13.1](https://github.com/hellobertrand/zxc) | 2026-07-15 | |
+| [zxc 0.13.2](https://github.com/hellobertrand/zxc) | 2026-07-30 | |
 
 **Warning**: The compressors listed below have security issues and/or are no longer maintained.
 
