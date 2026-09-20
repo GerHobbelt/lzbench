@@ -548,6 +548,7 @@ void lzbench_process_single_codec(ThreadPool& pool, int numThreads, lzbench_para
 
 
     LZBENCH_PRINT(5, "*** trying %s insize=%zu comprsize=%zu chunk_size=%zu\n", desc->name, insize, comprsize, effective_max_chunk_size);
+    fflush(stdout); // flush so a crashing codec is identifiable in redirected/CI logs
 
     if (!desc->compress || !desc->decompress) return;
     if (level < desc->first_level || level > desc->last_level) {
@@ -877,7 +878,10 @@ int lzbench_join(lzbench_params_t* params, const char** inFileNames, unsigned if
         insize = ftello(in);
         rewind(in);
 
-        if (inpos + insize > totalsize) { printf("inpos + insize > totalsize\n"); goto _clean; };
+        if (inpos + insize > totalsize) {
+            printf("ERROR: inpos=%llu + insize=%llu > totalsize=%llu\n", (uint64)inpos, (uint64)insize, (uint64)totalsize);
+            goto _clean;
+        }
         insize = fread(inbuf+inpos, 1, insize, in);
         file_sizes.push_back(insize);
         inpos += insize;

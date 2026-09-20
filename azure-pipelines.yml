@@ -350,15 +350,19 @@ jobs:
       artifactName: 'lzbench-$(ARTIFACT_SLUG)'
 
   - script: |
-      $QEMU_INTERPRETER ./lzbench -eLZ ./lzbench || exit 1
+      $QEMU_INTERPRETER ./lzbench -eLZ -v5 ./lzbench || exit 1
     displayName: '*** Run LZ'
 
   - script: |
-      $QEMU_INTERPRETER ./lzbench -eSYMMETRIC ./lzbench || exit 1
+      $QEMU_INTERPRETER ./lzbench -eSYMMETRIC -v5 ./lzbench || exit 1
     displayName: '*** Run SYMMETRIC'
 
   - script: |
-      $QEMU_INTERPRETER ./lzbench -eMISC ./lzbench || exit 1
+      $QEMU_INTERPRETER ./lzbench -eMISC -v5 ./lzbench || exit 1
+    displayName: '*** Run MISC'
+
+  - script: |
+      $QEMU_INTERPRETER ./lzbench -eFASTEST -t0,0 -T2 -jr . || exit 1
 
       RUN_TIME=$SECONDS
       echo --- Total time $(($RUN_TIME + $UPDATE_TIME + $BUILD_TIME)) seconds. Run time $RUN_TIME seconds. Build took $BUILD_TIME seconds. Packages updated in $UPDATE_TIME seconds.
@@ -366,7 +370,7 @@ jobs:
       rm -rf *
       df -Th
 
-    displayName: '*** Run MISC'
+    displayName: '*** Run FASTEST (-T2 -jr)'
 
 
 - job:
@@ -417,11 +421,11 @@ jobs:
   - task: ExtractFiles@1
     inputs:
       archiveFilePatterns: '$(Build.ArtifactStagingDirectory)\mingw.7z'
-      destinationFolder: '$(Build.SourcesDirectory)\mingw'
+      destinationFolder: '$(Build.BinariesDirectory)\mingw'
 
   - script: |
       echo Building with $(toolchain) for $(arch) architecture
-      set PATH=$(Build.SourcesDirectory)\mingw\$(toolchain)\bin;%PATH%
+      set PATH=$(Build.BinariesDirectory)\mingw\$(toolchain)\bin;%PATH%
       where $(SELECTED_CC)
       $(SELECTED_CXX) --version
       mingw32-make -j2 CC=$(SELECTED_CC) CXX=$(SELECTED_CXX) $(MORE_OPTIONS) || exit 1
@@ -436,13 +440,17 @@ jobs:
       artifactName: 'lzbench-$(ARTIFACT_SLUG)'
 
   - script: |
-      lzbench.exe -eLZ lzbench.exe || exit 1
+      lzbench.exe -eLZ -v5 lzbench.exe || exit 1
     displayName: 'Run LZ for $(arch) architecture'
 
   - script: |
-      lzbench.exe -eSYMMETRIC lzbench.exe || exit 1
+      lzbench.exe -eSYMMETRIC -v5 lzbench.exe || exit 1
     displayName: 'Run SYMMETRIC for $(arch) architecture'
 
   - script: |
-      lzbench.exe -eMISC lzbench.exe || exit 1
+      lzbench.exe -eMISC -v5 lzbench.exe || exit 1
     displayName: 'Run MISC for $(arch) architecture'
+
+  - script: |
+      lzbench.exe -eFASTEST -t0,0 -T2 -jr . || exit 1
+    displayName: 'Run FASTEST (-T2) for $(arch) architecture'

@@ -193,7 +193,7 @@ static const compressor_desc_t comp_desc[] =
     { "bsc_cuda7",  "bsc 3.3.11 -G -m7 -e0",   0,   0,    7,  BENCH_POOL_MT, lzbench_bsc_cuda_compress,   lzbench_bsc_cuda_decompress,   lzbench_bsc_init,        NULL,                    LZBENCH_BSC_MAX_INPUT_SIZE },
     { "bsc_cuda8",  "bsc 3.3.11 -G -m8 -e0",   0,   0,    8,  BENCH_POOL_MT, lzbench_bsc_cuda_compress,   lzbench_bsc_cuda_decompress,   lzbench_bsc_init,        NULL,                    LZBENCH_BSC_MAX_INPUT_SIZE },
     { "bzip2",      "bzip2 1.0.8",             1,   9,    0,  BENCH_POOL_MT, lzbench_bzip2_compress,      lzbench_bzip2_decompress,      NULL,                    NULL },
-    { "bzip3",      "bzip3 1.5.2",             1,  10,    0,  BENCH_POOL_MT, lzbench_bzip3_compress,      lzbench_bzip3_decompress,      NULL,                    NULL },
+    { "bzip3",      "bzip3 1.5.3",             1,  10,    0,  BENCH_POOL_MT, lzbench_bzip3_compress,      lzbench_bzip3_decompress,      NULL,                    NULL },
     { "crush",      "crush 1.0",               0,   2,    0,   NO_THREADING, lzbench_crush_compress,      lzbench_crush_decompress,      NULL,                    NULL },
     { "csc",        "csc 2016-10-13",          1,   5,    0,  BENCH_POOL_MT, lzbench_csc_compress,        lzbench_csc_decompress,        NULL,                    NULL },
     { "cudaMemcpy", "cudaMemcpy",              0,   0,    0,  BENCH_POOL_MT, lzbench_cuda_memcpy,         lzbench_cuda_memcpy,           lzbench_cuda_init,       lzbench_cuda_deinit },
@@ -217,7 +217,7 @@ static const compressor_desc_t comp_desc[] =
     { "lzham24",    "lzham 1.0 -d24",          0,   4,   24, FULL_THREADING, lzbench_lzham_compress,      lzbench_lzham_decompress,      NULL,                    NULL },
     { "lzjb",       "lzjb 2010",               0,   0,    0,  BENCH_POOL_MT, lzbench_lzjb_compress,       lzbench_lzjb_decompress,       NULL,                    NULL },
     { "lzlib",      "lzlib 1.15",              0,   9,    0,  BENCH_POOL_MT, lzbench_lzlib_compress,      lzbench_lzlib_decompress,      NULL,                    NULL },
-    { "lzma",       "lzma 25.01",              0,   9,    0, FULL_THREADING, lzbench_lzma_compress,       lzbench_lzma_decompress,       NULL,                    NULL },
+    { "lzma",       "lzma 26.01",              0,   9,    0, FULL_THREADING, lzbench_lzma_compress,       lzbench_lzma_decompress,       NULL,                    NULL },
     { "lzmat",      "lzmat 1.01",              0,   0,    0,  BENCH_POOL_MT, lzbench_lzmat_compress,      lzbench_lzmat_decompress,      NULL,                    NULL }, // decompression error (returns 0) and SEGFAULT (?)
     { "lzo1",       "lzo1 2.10",               1,  99,    0,  BENCH_POOL_MT, lzbench_lzo1_compress,       lzbench_lzo1_decompress,       lzbench_lzo_init,        lzbench_lzo_deinit },
     { "lzo1a",      "lzo1a 2.10",              1,  99,    0,  BENCH_POOL_MT, lzbench_lzo1a_compress,      lzbench_lzo1a_decompress,      lzbench_lzo_init,        lzbench_lzo_deinit },
@@ -237,7 +237,7 @@ static const compressor_desc_t comp_desc[] =
     { "lzvn",       "lzvn 2017-03-08",         0,   0,    0,  BENCH_POOL_MT, lzbench_lzvn_compress,       lzbench_lzvn_decompress,       lzbench_lzvn_init,       lzbench_lzvn_deinit },
     { "memlz",      "memlz 0.2 beta",          0,   0,    0,  BENCH_POOL_MT, lzbench_memlz_compress,      lzbench_memlz_decompress,      lzbench_memlz_init,      lzbench_memlz_deinit },
     { "nvcomp_lz4", "nvcomp_lz4 2.2.0",        0,   7,    0,  BENCH_POOL_MT, lzbench_nvcomp_compress,     lzbench_nvcomp_decompress,     lzbench_nvcomp_init,     lzbench_nvcomp_deinit },
-    { "ppmd8",      "ppmd8 25.01",             1,   9,    0,  BENCH_POOL_MT, lzbench_ppmd_compress,       lzbench_ppmd_decompress,       NULL,                    NULL },
+    { "ppmd8",      "ppmd8 26.01",             1,   9,    0,  BENCH_POOL_MT, lzbench_ppmd_compress,       lzbench_ppmd_decompress,       NULL,                    NULL },
     { "quicklz",    "quicklz 1.5.1 beta 7",    1,   3,    0,  BENCH_POOL_MT, lzbench_quicklz_compress,    lzbench_quicklz_decompress,    NULL,                    NULL },
     { "skim",       "skim 0.1.0",              0,   0,    0,  BENCH_POOL_MT, lzbench_skim_compress,       lzbench_skim_decompress,       lzbench_skim_init,       lzbench_skim_deinit },
     { "slz_deflate","slz_deflate 1.2.1",       1,   3,    2,  BENCH_POOL_MT, lzbench_slz_compress,        lzbench_slz_decompress,        NULL,                    NULL },
@@ -250,10 +250,10 @@ static const compressor_desc_t comp_desc[] =
     { "ucl_nrv2d",  "ucl_nrv2d 1.03",          1,   9,    0,  BENCH_POOL_MT, lzbench_ucl_nrv2d_compress,  lzbench_ucl_nrv2d_decompress,  NULL,                    NULL },
     { "ucl_nrv2e",  "ucl_nrv2e 1.03",          1,   9,    0,  BENCH_POOL_MT, lzbench_ucl_nrv2e_compress,  lzbench_ucl_nrv2e_decompress,  NULL,                    NULL },
     { "wflz",       "wflz 2015-09-16",         0,   0,    0,  BENCH_POOL_MT, lzbench_wflz_compress,       lzbench_wflz_decompress,       lzbench_wflz_init,       lzbench_wflz_deinit }, // SEGFAULT on decompression with gcc 4.9+ -O3 on Ubuntu
-    { "xz",         "xz 5.8.1",                0,   9,    0, FULL_THREADING, lzbench_xz_compress,         lzbench_xz_decompress,         NULL,                    NULL },
+    { "xz",         "xz 5.8.3",                0,   9,    0, FULL_THREADING, lzbench_xz_compress,         lzbench_xz_decompress,         NULL,                    NULL },
     { "yalz77",     "yalz77 2015-09-19",       1,  12,    0,  BENCH_POOL_MT, lzbench_yalz77_compress,     lzbench_yalz77_decompress,     NULL,                    NULL },
     { "yappy",      "yappy 2014-03-22",        1,  12,    0,   NO_THREADING, lzbench_yappy_compress,      lzbench_yappy_decompress,      lzbench_yappy_init,      NULL },
-    { "zlib",       "zlib 1.3.1",              1,   9,    0,  BENCH_POOL_MT, lzbench_zlib_compress,       lzbench_zlib_decompress,       NULL,                    NULL },
+    { "zlib",       "zlib 1.3.2",              1,   9,    0,  BENCH_POOL_MT, lzbench_zlib_compress,       lzbench_zlib_decompress,       NULL,                    NULL },
     { "zlib-ng",    "zlib-ng 2.2.5",           1,   9,    0,  BENCH_POOL_MT, lzbench_zlib_ng_compress,    lzbench_zlib_ng_decompress,    NULL,                    NULL },
     { "zling",      "zling 2018-10-12",        0,   4,    0,  BENCH_POOL_MT, lzbench_zling_compress,      lzbench_zling_decompress,      NULL,                    NULL },
     { "zpaq",       "zpaq 7.15",               1,   5,    0,  BENCH_POOL_MT, lzbench_zpaq_compress,       lzbench_zpaq_decompress,       NULL,                    NULL },
@@ -275,22 +275,30 @@ static const alias_desc_t alias_desc[] =
     { "FAST", "Refers to compressors capable of achieving compression speeds exceeding 100 MB/s (default alias).",
               "memcpy/density,1,2,3/fastlz/kanzi,1,2,3/lizard,10,11,12,13,14/lz4/lz4fast,3,17/lzav/lzf/lzfse/lzo1b,1/lzo1c,1/lzo1f,1/lzo1x,1/lzo1y,1/" \
               "lzsse4fast/lzsse8,1/lzvn/quicklz,1,2/skim/snappy/yalz77,1/zstd,1,2,3,4,5" },
-    { "ALL",  "Represents all major compressors.",
-              "LZ/SYMMETRIC/MISC" },
-    // CI uses LZ + SYMMETRIC + MISC for testing
+    // CI uses LZ + SYMMETRIC + MISC for single-threaded testing
     { "LZ",   "Represents all major LZ-based compressors.",
               "memcpy/aceapex,1,2/brieflz,1,3,6,8/brotli,0,2,5,8,11/" \
               "fastlz,1,2/fastlzma2,1,3,5,8,10/kanzi,1,2,3,4/libdeflate,1,3,6,9,12/" \
               "lizard,10,12,15,19,20,22,25,29,30,32,35,39,40,42,45,49/lz4fast,17,9,3/lz4/lz4hc,1,4,9,12/lzav/" \
               "lzf,0,1/lzfse/lzg,1,4,6,8/lzham,0,1/lzlib,0,3,6,9/lzma,0,2,4,6,9/" \
               "lzo1/lzo1a/lzo1b,1,3,6,9,99,999/lzo1c,1,3,6,9,99,999/lzo1f/lzo1x/lzo1y/lzo1z/lzo2a/" \
-              "lzsse2,1,6,12,16/lzsse4,1,6,12,16/lzsse8,1,6,12,16/lzvn/memlz/quicklz,1,2,3/" \
+              "lzsse2,1,6,12,16/lzsse4fast/lzsse4,1,6,12,16/lzsse8,1,6,12,16/lzvn/memlz/quicklz,1,2,3/" \
               "slz_gzip/snappy/ucl_nrv2b,1,6,9/ucl_nrv2d,1,6,9/ucl_nrv2e,1,6,9/" \
               "xz,1,3,5,7,9/yalz77,1,6,12/zlib,1,6,9/zlib-ng,1,6,9/zstd_fast,-5,-3,-1/zstd,1,2,5,8,11,15,18,22/zxc,1,3,6" },
     { "SYMMETRIC", "Includes compressors with similar compression and decompression speeds.",
               "memcpy/bsc1/bsc4/bsc5/bzip2,1,5,9/bzip3,1,5,9/density,1,2,3/kanzi,5,6,7,8,9/ppmd8,1,4,9/zpaq,1,5" },
     { "MISC", "Covers miscellaneous compressors.",
               "memcpy/crush,0,2/lzjb/skim/tamp,8,12,15/tornado,1,6,11,16/zling,0,2,4" },
+    { "ALL",  "Represents all major compressors.",
+              "LZ/SYMMETRIC/MISC" },
+    // CI uses FASTEST for multi-threaded testing
+    { "FASTEST", "All LZ/SYMMETRIC/MISC compressors, each at only its fastest level.",
+     /* LZ */ "memcpy/aceapex-DISABLED,1/brieflz,1/brotli,0/fastlz,1/fastlzma2,1/kanzi,1/libdeflate,1/lizard,10/lz4fast,99/lz4/lz4hc,1/lzav,1/" \
+              "lzf,0/lzfse/lzham,0/lzlib,0/lzma,0/lzo1,1/lzo1a,1/lzo1b,1/lzo1c,1/lzo1f,1/lzo1x,1/lzo1y,1/lzo1z/lzo2a/lzsse2,1/" \
+              "lzsse4fast/lzsse4,1/lzsse8,1/lzvn/memlz/quicklz,1/slz_gzip,1/snappy/ucl_nrv2b,1/ucl_nrv2d,1/ucl_nrv2e,1/xz,0/yalz77,1/" \
+              "zlib,1/zlib-ng,1/zstd_fast,-5/zstd,1/zxc,1/" /* aceapex is disabled as it has issues with tiny inputs */ \
+/* SYMMETR */ "bsc1/bzip2,1/bzip3,1/density,1/ppmd8,1/zpaq,1/" \
+   /* MISC */ "crush,0/lzjb/skim/tamp,8/tornado-DISABLED,1/zling,0" }, /* Tornado is disabled as it has issues with incompressible data */
     { "SLOW", "Lists very slow compressors.",
               "memcpy/glza" },
     { "BUGGY", "Lists potentially unstable codecs that may cause segmentation faults.",
