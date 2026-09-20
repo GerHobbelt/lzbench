@@ -81,55 +81,56 @@ int zxc_cctx_init(zxc_cctx_t* RESTRICT ctx, const size_t chunk_size, const int m
     ctx->chunk_size = chunk_size;
     const uint32_t offset_bits = zxc_log2_u32((uint32_t)chunk_size);
     ctx->offset_bits = offset_bits;
-    ctx->offset_mask = (1U << offset_bits) - 1;
-    ctx->max_epoch = 1U << (32 - offset_bits);
+    ctx->offset_mask = (uint32_t)((1ULL << offset_bits) - 1);
+    ctx->max_epoch = (uint32_t)(1ULL << (32 - offset_bits));
 
     if (mode == 0) return ZXC_OK;
 
-    const size_t max_seq = chunk_size / sizeof(uint32_t) + 256;
-    const size_t sz_hash = 2 * ZXC_LZ_HASH_SIZE * sizeof(uint32_t);
-    const size_t sz_chain = chunk_size * sizeof(uint16_t);
-    const size_t sz_sequences = max_seq * sizeof(uint32_t);
-    const size_t sz_tokens = max_seq * sizeof(uint8_t);
-    const size_t sz_offsets = max_seq * sizeof(uint16_t);
-    const size_t sz_extras =
-        max_seq * 2 *
-        ZXC_VBYTE_ALLOC_LEN;  // Max 3 bytes per LL/ML VByte (sufficient for 256KB block)
+    const size_t max_seq = chunk_size / ZXC_LZ_MIN_MATCH_LEN + 16;
+    const size_t sz_hash_pos = ZXC_LZ_HASH_SIZE * sizeof(uint32_t);
+    const size_t sz_hash_tags = ZXC_LZ_HASH_SIZE * sizeof(uint8_t);
+    const size_t sz_chain = ZXC_LZ_WINDOW_SIZE * sizeof(uint16_t);
+    /* buf_sequences (GHI, level <= 2) aliases buf_offsets + buf_tokens (GLO,
+     * level >= 3). Mutually exclusive per block; sized for the larger. */
+    const size_t sz_seq_union = max_seq * sizeof(uint32_t);
+    /* Varint bytes per LL/ML: scales with chunk_size. */
+    const size_t vbyte_len = (offset_bits + 6) / 7;
+    const size_t sz_extras = max_seq * 2 * vbyte_len;
     const size_t sz_lit = chunk_size + ZXC_PAD_SIZE;
 
-    // Calculate sizes with alignment padding (64 bytes for cache line alignment)
+    /* Calculate sizes with alignment padding (64 bytes for cache line alignment) */
     size_t total_size = 0;
-    const size_t off_hash = total_size;
-    total_size += (sz_hash + ZXC_ALIGNMENT_MASK) & ~ZXC_ALIGNMENT_MASK;
+    const size_t off_hash_pos = total_size;
+    total_size += ZXC_ALIGN_CL(sz_hash_pos);
+    const size_t off_hash_tags = total_size;
+    total_size += ZXC_ALIGN_CL(sz_hash_tags);
     const size_t off_chain = total_size;
-    total_size += (sz_chain + ZXC_ALIGNMENT_MASK) & ~ZXC_ALIGNMENT_MASK;
-    const size_t off_sequences = total_size;
-    total_size += (sz_sequences + ZXC_ALIGNMENT_MASK) & ~ZXC_ALIGNMENT_MASK;
-    const size_t off_tokens = total_size;
-    total_size += (sz_tokens + ZXC_ALIGNMENT_MASK) & ~ZXC_ALIGNMENT_MASK;
-    const size_t off_offsets = total_size;
-    total_size += (sz_offsets + ZXC_ALIGNMENT_MASK) & ~ZXC_ALIGNMENT_MASK;
+    total_size += ZXC_ALIGN_CL(sz_chain);
+    const size_t off_seq_union = total_size;
+    total_size += ZXC_ALIGN_CL(sz_seq_union);
     const size_t off_extras = total_size;
-    total_size += (sz_extras + ZXC_ALIGNMENT_MASK) & ~ZXC_ALIGNMENT_MASK;
+    total_size += ZXC_ALIGN_CL(sz_extras);
     const size_t off_lit = total_size;
-    total_size += (sz_lit + ZXC_ALIGNMENT_MASK) & ~ZXC_ALIGNMENT_MASK;
+    total_size += ZXC_ALIGN_CL(sz_lit);
 
     uint8_t* const mem = (uint8_t*)zxc_aligned_malloc(total_size, ZXC_CACHE_LINE_SIZE);
     if (UNLIKELY(!mem)) return ZXC_ERROR_MEMORY;
 
     ctx->memory_block = mem;
-    ctx->hash_table = (uint32_t*)(mem + off_hash);
+    ctx->hash_table = (uint32_t*)(mem + off_hash_pos);
+    ctx->hash_tags = (uint8_t*)(mem + off_hash_tags);
     ctx->chain_table = (uint16_t*)(mem + off_chain);
-    ctx->buf_sequences = (uint32_t*)(mem + off_sequences);
-    ctx->buf_tokens = (uint8_t*)(mem + off_tokens);
-    ctx->buf_offsets = (uint16_t*)(mem + off_offsets);
+    ctx->buf_sequences = (uint32_t*)(mem + off_seq_union);
+    ctx->buf_offsets = (uint16_t*)(mem + off_seq_union);
+    ctx->buf_tokens = (uint8_t*)(mem + off_seq_union) + max_seq * sizeof(uint16_t);
     ctx->buf_extras = (uint8_t*)(mem + off_extras);
     ctx->literals = (uint8_t*)(mem + off_lit);
 
     ctx->compression_level = level;
     ctx->epoch = 1;
 
-    ZXC_MEMSET(ctx->hash_table, 0, sz_hash);
+    ZXC_MEMSET(ctx->hash_table, 0, sz_hash_pos);
+    ZXC_MEMSET(ctx->hash_tags, 0, sz_hash_tags);
     return ZXC_OK;
 }
 
@@ -157,7 +158,13 @@ void zxc_cctx_free(zxc_cctx_t* ctx) {
         ctx->work_buf = NULL;
     }
 
+    if (ctx->opt_scratch) {
+        zxc_aligned_free(ctx->opt_scratch);
+        ctx->opt_scratch = NULL;
+    }
+
     ctx->hash_table = NULL;
+    ctx->hash_tags = NULL;
     ctx->chain_table = NULL;
     ctx->buf_sequences = NULL;
     ctx->buf_tokens = NULL;
@@ -168,6 +175,7 @@ void zxc_cctx_free(zxc_cctx_t* ctx) {
     ctx->epoch = 0;
     ctx->lit_buffer_cap = 0;
     ctx->work_buf_cap = 0;
+    ctx->opt_scratch_cap = 0;
 }
 
 /*
@@ -245,7 +253,7 @@ int zxc_read_file_header(const uint8_t* RESTRICT src, const size_t src_size,
             block_size = (size_t)1U << code;
         } else if (code == 64) {
             // Legacy: hardcoded 256 KB default
-            block_size = ZXC_BLOCK_SIZE_DEFAULT;
+            block_size = 256 * 1024;
         } else {
             return ZXC_ERROR_BAD_BLOCK_SIZE;
         }
@@ -530,7 +538,7 @@ int zxc_read_ghi_header_and_desc(const uint8_t* RESTRICT src, const size_t len,
  */
 int zxc_bitpack_stream_32(const uint32_t* RESTRICT src, const size_t count, uint8_t* RESTRICT dst,
                           const size_t dst_cap, const uint8_t bits) {
-    const size_t out_bytes = ((count * bits) + ZXC_BITS_PER_BYTE - 1) / ZXC_BITS_PER_BYTE;
+    const size_t out_bytes = ((count * bits) + CHAR_BIT - 1) / CHAR_BIT;
 
     // +4 bytes: packing may write past out_bytes when the last value straddles a byte boundary.
     const size_t safe_bytes = out_bytes + sizeof(uint32_t);
@@ -545,22 +553,22 @@ int zxc_bitpack_stream_32(const uint32_t* RESTRICT src, const size_t count, uint
     // However, if bits=64 (unlikely for a 32-bit packer), it would be an issue.
     // For 0 < bits <= 32:
     const uint64_t val_mask =
-        (bits == sizeof(uint32_t) * ZXC_BITS_PER_BYTE) ? UINT32_MAX : ((1ULL << bits) - 1);
+        (bits == sizeof(uint32_t) * CHAR_BIT) ? UINT32_MAX : ((1ULL << bits) - 1);
 
     for (size_t i = 0; i < count; i++) {
         // Mask the input value to ensure we don't write garbage
-        const uint64_t v = ((uint64_t)src[i] & val_mask) << (bit_pos % ZXC_BITS_PER_BYTE);
+        const uint64_t v = ((uint64_t)src[i] & val_mask) << (bit_pos % CHAR_BIT);
 
-        const size_t byte_idx = bit_pos / ZXC_BITS_PER_BYTE;
+        const size_t byte_idx = bit_pos / CHAR_BIT;
         dst[byte_idx] |= (uint8_t)v;
-        if (bits + (bit_pos % ZXC_BITS_PER_BYTE) > 1 * ZXC_BITS_PER_BYTE)
-            dst[byte_idx + 1] |= (uint8_t)(v >> (1 * ZXC_BITS_PER_BYTE));
-        if (bits + (bit_pos % ZXC_BITS_PER_BYTE) > 2 * ZXC_BITS_PER_BYTE)
-            dst[byte_idx + 2] |= (uint8_t)(v >> (2 * ZXC_BITS_PER_BYTE));
-        if (bits + (bit_pos % ZXC_BITS_PER_BYTE) > 3 * ZXC_BITS_PER_BYTE)
-            dst[byte_idx + 3] |= (uint8_t)(v >> (3 * ZXC_BITS_PER_BYTE));
-        if (bits + (bit_pos % ZXC_BITS_PER_BYTE) > 4 * ZXC_BITS_PER_BYTE)
-            dst[byte_idx + 4] |= (uint8_t)(v >> (4 * ZXC_BITS_PER_BYTE));
+        if (bits + (bit_pos % CHAR_BIT) > 1 * CHAR_BIT)
+            dst[byte_idx + 1] |= (uint8_t)(v >> (1 * CHAR_BIT));
+        if (bits + (bit_pos % CHAR_BIT) > 2 * CHAR_BIT)
+            dst[byte_idx + 2] |= (uint8_t)(v >> (2 * CHAR_BIT));
+        if (bits + (bit_pos % CHAR_BIT) > 3 * CHAR_BIT)
+            dst[byte_idx + 3] |= (uint8_t)(v >> (3 * CHAR_BIT));
+        if (bits + (bit_pos % CHAR_BIT) > 4 * CHAR_BIT)
+            dst[byte_idx + 4] |= (uint8_t)(v >> (4 * CHAR_BIT));
         bit_pos += bits;
     }
     return (int)out_bytes;
@@ -575,7 +583,11 @@ int zxc_bitpack_stream_32(const uint32_t* RESTRICT src, const size_t count, uint
  * @brief Returns the maximum compressed size for a given input size.
  *
  * The result accounts for the file header, per-block headers, block
- * checksums, worst-case expansion, EOF block, and the file footer.
+ * checksums, worst-case expansion, EOF block, seekable overhead (SEK
+ * block), and the file footer.
+ *
+ * The block count is derived from @ref ZXC_BLOCK_SIZE_MIN (4 KB) to
+ * guarantee the bound holds for all valid block sizes and seekable mode.
  *
  * @param[in] input_size Uncompressed input size in bytes.
  * @return Upper bound on compressed size, or 0 if @p input_size would overflow.
@@ -583,10 +595,88 @@ int zxc_bitpack_stream_32(const uint32_t* RESTRICT src, const size_t count, uint
 uint64_t zxc_compress_bound(const size_t input_size) {
     // Guard UINT64_MAX / SIZE_MAX would overflow.
     if (UNLIKELY(input_size > (SIZE_MAX - (SIZE_MAX >> 8)))) return 0;
-    uint64_t n = ((uint64_t)input_size + ZXC_BLOCK_SIZE_DEFAULT - 1) / ZXC_BLOCK_SIZE_DEFAULT;
+    uint64_t n = ((uint64_t)input_size + ZXC_BLOCK_SIZE_MIN - 1) / ZXC_BLOCK_SIZE_MIN;
     if (n == 0) n = 1;
     return ZXC_FILE_HEADER_SIZE + (n * (ZXC_BLOCK_HEADER_SIZE + ZXC_BLOCK_CHECKSUM_SIZE + 64)) +
-           (uint64_t)input_size + ZXC_BLOCK_HEADER_SIZE + ZXC_FILE_FOOTER_SIZE;
+           (uint64_t)input_size + ZXC_BLOCK_HEADER_SIZE + /* EOF block */
+           ZXC_BLOCK_HEADER_SIZE +                        /* SEK block header (seekable) */
+           (n * ZXC_SEEK_ENTRY_SIZE) +                    /* SEK entries: 4 bytes per block */
+           ZXC_FILE_FOOTER_SIZE;
+}
+
+/*
+ * @brief Returns the maximum compressed size for a single block (no file framing).
+ *
+ * @param[in] input_size Uncompressed block size in bytes.
+ * @return Upper bound on compressed block size, or 0 on overflow.
+ */
+uint64_t zxc_compress_block_bound(const size_t input_size) {
+    if (UNLIKELY(input_size > (SIZE_MAX - (SIZE_MAX >> 8)))) return 0;
+    // Block header + worst-case expansion (64B overhead) + checksum
+    return (uint64_t)ZXC_BLOCK_HEADER_SIZE + (uint64_t)input_size + 64 + ZXC_BLOCK_CHECKSUM_SIZE;
+}
+
+/*
+ * @brief Returns the minimum dst_capacity required by zxc_decompress_block().
+ *
+ * The decoder uses speculative wild-copy writes on its fast path.
+ * Sizing the destination to uncompressed_size + ZXC_PAD_SIZE*66 guarantees
+ * the fast path is always reachable and that tail bounds checks never
+ * spuriously reject the last literals of a valid block.
+ */
+uint64_t zxc_decompress_block_bound(const size_t uncompressed_size) {
+    if (UNLIKELY(uncompressed_size > SIZE_MAX - ZXC_DECOMPRESS_TAIL_PAD)) return 0;
+    return (uint64_t)uncompressed_size + ZXC_DECOMPRESS_TAIL_PAD;
+}
+
+/*
+ * @brief Estimates the total buffer bytes allocated inside a cctx for a block.
+ *
+ * Mirrors the persistent allocation layout in zxc_cctx_init(): each sub-buffer
+ * is rounded up to the cache-line boundary, so the returned value matches the
+ * single aligned allocation performed by the initializer.
+ *
+ * For @p level >= 6 the figure also includes ctx->opt_scratch (~8.125 bytes
+ * per chunk_size byte: dp + parent_len + parent_off + a 1-bit-per-position
+ * match-end bitmap), the cache-line-aligned scratch used by the optimal
+ * parser. It is lazy-allocated on the first level-6 call and persists for
+ * the lifetime of the cctx (no per-block malloc/free).
+ */
+uint64_t zxc_estimate_cctx_size(const size_t src_size, const int level) {
+    if (UNLIKELY(src_size == 0)) return 0;
+
+    const size_t chunk_size = zxc_block_size_ceil(src_size);
+    const uint32_t offset_bits = zxc_log2_u32((uint32_t)chunk_size);
+    const size_t max_seq = chunk_size / ZXC_LZ_MIN_MATCH_LEN + 16;
+    const size_t vbyte_len = (offset_bits + 6) / 7;
+
+    uint64_t total = 0;
+    total += ZXC_ALIGN_CL(ZXC_LZ_HASH_SIZE * sizeof(uint32_t));   /* hash_table */
+    total += ZXC_ALIGN_CL(ZXC_LZ_HASH_SIZE * sizeof(uint8_t));    /* hash_tags */
+    total += ZXC_ALIGN_CL(ZXC_LZ_WINDOW_SIZE * sizeof(uint16_t)); /* chain_table (ring) */
+    /* sequences / tokens+offsets alias the same region (see zxc_cctx_init). */
+    total += ZXC_ALIGN_CL(max_seq * sizeof(uint32_t)); /* seq_union */
+    total += ZXC_ALIGN_CL(max_seq * 2 * vbyte_len);    /* buf_extras */
+    total += ZXC_ALIGN_CL(chunk_size + ZXC_PAD_SIZE);  /* literals */
+
+    /* The opaque wrapper struct allocated by zxc_create_cctx() adds a tiny
+     * fixed overhead (< 128 B) that is negligible next to the per-chunk
+     * buffers above and is intentionally omitted. */
+
+    if (level >= ZXC_LEVEL_DENSITY) {
+        const size_t n_bm_words = (chunk_size + 1 + 63) / 64;
+        size_t opt = ZXC_ALIGN_CL((chunk_size + 1) * sizeof(uint32_t)); /* dp             */
+        opt += ZXC_ALIGN_CL((chunk_size + 1) * sizeof(uint16_t));       /* parent_len     */
+        opt += ZXC_ALIGN_CL((chunk_size + 1) * sizeof(uint16_t));       /* parent_off     */
+        opt += ZXC_ALIGN_CL(n_bm_words * sizeof(uint64_t));             /* match_end_bits */
+        /* opt_scratch is sized to hold both the DP arrays and (transiently)
+         * the package-merge scratch for the Huffman code-length builder;
+         * report the larger of the two. */
+        const size_t huf = ZXC_ALIGN_CL(ZXC_HUF_BUILD_SCRATCH_SIZE);
+        total += (opt > huf) ? opt : huf;
+    }
+
+    return total;
 }
 
 /*
@@ -638,3 +728,40 @@ const char* zxc_error_name(const int code) {
             return "ZXC_UNKNOWN_ERROR";
     }
 }
+
+/*
+ * ============================================================================
+ * LIBRARY INFORMATION
+ * ============================================================================
+ */
+
+/*
+ * @brief Returns the minimum supported compression level.
+ *
+ * Returns the value of ZXC_LEVEL_FASTEST (currently 1).
+ * This allows integrators to discover the level range at runtime without relying on
+ * compile-time macros alone.
+ */
+int zxc_min_level(void) { return ZXC_LEVEL_FASTEST; }
+
+/*
+ * @brief Returns the maximum supported compression level.
+ *
+ * Returns the value of ZXC_LEVEL_DENSITY (currently 6).
+ */
+int zxc_max_level(void) { return ZXC_LEVEL_DENSITY; }
+
+/*
+ * @brief Returns the default compression level.
+ *
+ * Returns the value of ZXC_LEVEL_DEFAULT (currently 3).
+ */
+int zxc_default_level(void) { return ZXC_LEVEL_DEFAULT; }
+
+/*
+ * @brief Returns the human-readable library version string.
+ *
+ * The returned pointer is a compile-time constant and must not be freed.
+ * Example: "0.9.1".
+ */
+const char* zxc_version_string(void) { return ZXC_LIB_VERSION_STR; }

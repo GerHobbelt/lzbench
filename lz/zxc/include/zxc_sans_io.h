@@ -20,9 +20,6 @@
  * -# Compress or decompress individual blocks via the chunk wrappers.
  * -# Write the footer with zxc_write_file_footer().
  * -# Release the context with zxc_cctx_free().
- *
- * @see zxc_buffer.h  for the simple one-shot API.
- * @see zxc_stream.h  for the multi-threaded streaming API.
  */
 
 #ifndef ZXC_SANS_IO_H
@@ -52,8 +49,8 @@ extern "C" {
  * the overhead of repeated memory allocations.
  *
  * **Key Fields:**
- * - `hash_table`: Stores indices of 4-byte sequences. Size is `2 *
- * ZXC_LZ_HASH_SIZE` to reduce collisions (load factor < 0.5).
+ * - `hash_table`: Stores epoch-tagged positions (`ZXC_LZ_HASH_SIZE` * 4 bytes).
+ * - `hash_tags`:  Stores 8-bit tags for fast rejection (`ZXC_LZ_HASH_SIZE` * 1 byte).
  * - `chain_table`: Handles collisions by storing the *previous* occurrence of a
  *   hash. This forms a linked list for each hash bucket, allowing us to
  * traverse history.
@@ -79,7 +76,8 @@ extern "C" {
 typedef struct {
     /* Hot zone: random access / high frequency.
      * Kept at the start to ensure they reside in the first cache line (64 bytes). */
-    uint32_t* hash_table;  /**< Hash table for LZ77 match finding. */
+    uint32_t* hash_table;  /**< Hash table for LZ77 match positions (epoch|pos). */
+    uint8_t* hash_tags;    /**< Split tag table for fast match rejection (8-bit tags). */
     uint16_t* chain_table; /**< Chain table for collision resolution. */
     void* memory_block;    /**< Single allocation block owner. */
     uint32_t epoch;        /**< Current epoch for lazy hash table invalidation. */
@@ -92,12 +90,17 @@ typedef struct {
     uint8_t* literals;       /**< Buffer for literal bytes. */
 
     /* Cold zone: configuration / scratch / resizeable. */
-    uint8_t* lit_buffer;   /**< Scratch buffer for literals (RLE). */
-    size_t lit_buffer_cap; /**< Current capacity of the scratch buffer. */
-    uint8_t* work_buf;     /**< Padded scratch buffer for buffer-API decompression. */
-    size_t work_buf_cap;   /**< Capacity of the work buffer. */
-    int checksum_enabled;  /**< 1 if checksum calculation/verification is enabled. */
-    int compression_level; /**< Compression level. */
+    uint8_t* lit_buffer;    /**< Scratch buffer for literals (RLE). */
+    size_t lit_buffer_cap;  /**< Current capacity of the scratch buffer. */
+    uint8_t* work_buf;      /**< Padded scratch buffer for buffer-API decompression. */
+    size_t work_buf_cap;    /**< Capacity of the work buffer. */
+    uint8_t* opt_scratch;   /**< Optimal-parser DP scratch (level >= 6 only,
+                                 lazy-allocated, packs dp/parent_len/parent_off/actions).
+                                 Also reused as transient scratch for the
+                                 length-limited Huffman code-length builder. */
+    size_t opt_scratch_cap; /**< Current capacity of opt_scratch in bytes. */
+    int checksum_enabled;   /**< 1 if checksum calculation/verification is enabled. */
+    int compression_level;  /**< Compression level. */
 
     /* Block-size derived parameters (computed once at init). */
     size_t chunk_size;    /**< Effective block size in bytes. */
@@ -144,7 +147,8 @@ ZXC_EXPORT void zxc_cctx_free(zxc_cctx_t* ctx);
  *
  * @param[out] dst The destination buffer where the header will be written.
  * @param[in] dst_capacity The total capacity of the destination buffer in bytes.
- * @param[in] has_checksum Flag indicating whether the checksum bit should be set.
+ * @param[in] chunk_size    The block size to encode in the header.
+ * @param[in] has_checksum  Flag indicating whether the checksum bit should be set.
  * @return The number of bytes written (ZXC_FILE_HEADER_SIZE) on success,
  *         or ZXC_ERROR_DST_TOO_SMALL if the destination capacity is insufficient.
  */
@@ -160,8 +164,8 @@ ZXC_EXPORT int zxc_write_file_header(uint8_t* dst, const size_t dst_capacity,
  *
  * @param[in] src Pointer to the source buffer containing the file data.
  * @param[in] src_size Size of the source buffer in bytes.
- * @param[out] out_block_size Optional pointer to receive the recommended block size.
- * @param[out] out_has_checksum Optional pointer to receive the checksum flag.
+ * @param[out] out_block_size    Optional pointer to receive the recommended block size.
+ * @param[out] out_has_checksum  Optional pointer to receive the checksum flag.
  * @return ZXC_OK on success, or a negative error code (e.g., ZXC_ERROR_SRC_TOO_SMALL,
  * ZXC_ERROR_BAD_MAGIC, ZXC_ERROR_BAD_VERSION).
  */
