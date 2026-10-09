@@ -103,10 +103,13 @@ else
     endif
 
     # some compressors use dlopen(), which requires linking with -ldl on glibc
-    # 2.33 and older, and other libc libraries.
+    # 2.33 and older, and other libc libraries. Use -ldl only when dlopen()
+    # links with it but not without it: a MinGW cross build from Linux has no
+    # dlopen() at all, and no libdl either.
     # GNU Make 3.8.x fails to parse \# inside the $(shell ...) function.
     LIBDL_TEST_SRC := \#include <dlfcn.h>\nint main(){dlopen(0,0);return 0;}\n
-    LIBDL := $(shell printf '${LIBDL_TEST_SRC}' | $(CXX) -x c - -o /dev/null 2>/dev/null && echo "" || echo "-ldl")
+    LIBDL := $(shell printf '${LIBDL_TEST_SRC}' | $(CXX) -x c - -o /dev/null 2>/dev/null || \
+               { printf '${LIBDL_TEST_SRC}' | $(CXX) -x c - -ldl -o /dev/null 2>/dev/null && echo "-ldl"; })
 
     # detect MacOS
     detected_OS := $(shell uname -s)
@@ -231,7 +234,7 @@ SNAPPY_RVV_1:=$(shell $(SNAPPY_RVV))
 rvv_prefix=
 SNAPPY_RVV_0_7:=$(shell $(SNAPPY_RVV))
 
-# Rust codecs (density, mbrotli) are built into one library from
+# Rust codecs (density, mbrotli, pulsar) are built into one library from
 # misc/rust-codecs: two Rust staticlibs each carry their own copy of std and
 # cannot be linked into the same binary.
 HOST_ARCH   := $(shell uname -m)
@@ -246,18 +249,22 @@ endif
 
 # Only build Rust codecs if native build, not 32-bit, not Windows
 ifneq ($(HAVE_CARGO),1)
-    $(info Cargo not found – skipping Rust codecs (density, mbrotli))
+    $(info Cargo not found – skipping Rust codecs (density, mbrotli, pulsar))
     DONT_BUILD_DENSITY := 1
     DONT_BUILD_MBROTLI := 1
+    DONT_BUILD_PULSAR := 1
 else ifneq ($(HOST_ARCH),$(TARGET_ARCH)) # Skip cross-compilation
     DONT_BUILD_DENSITY := 1
     DONT_BUILD_MBROTLI := 1
+    DONT_BUILD_PULSAR := 1
 else ifeq ($(BUILD_ARCH),32-bit)         # Skip user requested 32-bit compilation
     DONT_BUILD_DENSITY := 1
     DONT_BUILD_MBROTLI := 1
+    DONT_BUILD_PULSAR := 1
 else ifneq (,$(filter Windows%,$(OS)))   # Skip Windows builds due to undefined reference errors on linking even when adding required native static libs to linking dependencies
     DONT_BUILD_DENSITY := 1
     DONT_BUILD_MBROTLI := 1
+    DONT_BUILD_PULSAR := 1
 endif
 
 RUST_FEATURES :=
@@ -276,6 +283,16 @@ ifneq ($(DONT_BUILD_MBROTLI),1)
         DONT_BUILD_MBROTLI := 1
     else
         RUST_FEATURES += mbrotli
+    endif
+endif
+ifneq ($(DONT_BUILD_PULSAR),1)
+    # pulsar itself is edition 2021, but it is built through misc/rust-codecs,
+    # which is edition 2024 (rust-version 1.85)
+    ifneq ($(HAVE_RUST_1_85),1)
+        $(info Cargo $(CARGO_VERSION) is older than 1.85 – skipping pulsar build)
+        DONT_BUILD_PULSAR := 1
+    else
+        RUST_FEATURES += pulsar
     endif
 endif
 
@@ -303,6 +320,9 @@ ifneq ($(strip $(RUST_FEATURES)),)
     endif
     ifneq (,$(filter mbrotli,$(RUST_FEATURES)))
         RUST_DEPS += $(shell find lz/mbrotli/Cargo.toml lz/mbrotli/src lz/mbrotli/mbrotli-ffi -type f)
+    endif
+    ifneq (,$(filter pulsar,$(RUST_FEATURES)))
+        RUST_DEPS += $(shell find bwt/pulsar/Cargo.toml bwt/pulsar/src -type f)
     endif
 
     LDFLAGS += -Wl,-rpath,$(RUST_SRC_DIR)target/release -L$(RUST_SRC_DIR)target/release -llzbench_rust
@@ -1115,6 +1135,10 @@ endif
 
 ifeq "$(DONT_BUILD_DENSITY)" "1"
     DEFINES += -DBENCH_REMOVE_DENSITY
+endif
+
+ifeq "$(DONT_BUILD_PULSAR)" "1"
+    DEFINES += -DBENCH_REMOVE_PULSAR
 endif
 
 
