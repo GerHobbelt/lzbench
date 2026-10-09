@@ -84,17 +84,18 @@ sources, the Notes column says so.
 | [lzham 1.0](https://github.com/richgel999/lzham_codec) | 2020-09-15 | Public domain since 2020-09-15. Build fixed in lzbench for MinGW and newer compilers (`<cstdint>` includes, `GetSystemInfo`, `DISABLE_THREADING`). Disabled on macOS and 32-bit x86 — 64 MB dictionary overflows the 32-bit address space |
 | lzjb 2010 | 2010 | |
 | [lzlib 1.16](https://www.nongnu.org/lzip/lzlib.html) | 2026-03-11 | |
-| [lzma v26.01](http://7-zip.org) | 2026-04-27 | |
+| [lzma v26.03](http://7-zip.org) | 2026-09-03 | |
 | [lzo 2.10](http://www.oberhumer.com/opensource/lzo) | 2017-03-01 | |
 | [lzsse 2019-04-18 (1847c3e827)](https://github.com/ConorStokes/LZSSE) | 2019-04-18 | 64-bit x86 only — requires SSE4.1 (Windows: MinGW-w64 only); lzsse8fast has a [bug](https://github.com/ConorStokes/LZSSE/issues/14) |
+| [mbrotli 0.5.2](https://github.com/Mnwa/mbrotli) | 2026-09-26 | Requires the Rust toolchain 1.89+ (skipped for 32-bit, cross-compiled and Windows builds). Built through the `mbrotli-ffi` C ABI; manifests trimmed in lzbench (no dev-dependencies, rlib only) |
 | [memlz 0.5 beta](https://github.com/rrrlasse/memlz) | 2026-09-24 | Patched in lzbench: SSE4.2 target attribute also applied for MinGW (`memlz.h`) |
 | [misa77 0.6.0](https://github.com/welcome-to-the-sunny-side/misa77) | 2026-07-30 | Little-endian 64-bit only — needs a C++20 compiler (GCC 10+, Clang 12+); skipped automatically |
 | [nvcomp 2.2.0](https://github.com/NVIDIA/nvcomp) | 2022-02-07 | CUDA only — built with `make ENABLE_CUDA=1`; not in the default CI matrix |
 | [openzl 0.2.3](https://openzl.org/) | 2026-07-28 | 64-bit only — upstream does not support 32-bit builds |
-| [ppmd8 26.01](http://7-zip.org) | 2026-04-27 | |
+| [ppmd8 26.03](http://7-zip.org) | 2026-09-03 | |
 | [quicklz 1.5.1 beta 7](https://web.archive.org/web/20160110073818/https://quicklz.com/) | 2011-10-07 | |
 | [skim 0.1.0](https://github.com/vantorrewannes/skim) | 2026-06-07 | Linux x86-64 and macOS only — requires the [Zig](https://ziglang.org) compiler |
-| [slz 1.2.2](http://www.libslz.org/) | 2026-04-09 | Compressor only; decompresses via zlib |
+| [slz 1.3.1](http://www.libslz.org/) | 2026-07-28 | Compressor only; decompresses via zlib |
 | [snappy 1.3.1](https://github.com/google/snappy) | 2026-09-18 | |
 | [tamp 2.3.0](https://github.com/BrianPugh/tamp) | 2026-07-09 | |
 | [tornado 0.6a](https://encode.su/threads/231-FreeArc-compression-suite-%284x4-Tornado-REP-Delta-Dict-%29) | 2014-03-08 | Disabled on RISC-V unless the build machine does misaligned access at full speed (asked via the hwprobe syscall); such a build is then not portable to a slower RISC-V machine |
