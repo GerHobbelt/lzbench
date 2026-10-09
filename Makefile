@@ -22,7 +22,7 @@
 # direct GNU Make to search the directories relative to the
 # parent directory of this file
 
-SOURCE_PATH=$(dir $(lastword $(MAKEFILE_LIST)))
+SOURCE_PATH := $(dir $(lastword $(MAKEFILE_LIST)))
 vpath
 vpath %.c $(SOURCE_PATH)
 vpath %.cc $(SOURCE_PATH)
@@ -277,11 +277,10 @@ else
     SKIM_FILE = misc/skim/libskim.a
 endif
 
-# On 32-bit ARM (armv5/v7): memlz does unaligned 64-bit loads (SIGBUS), and bsc
-# crashes in its multithreaded decompress path (lzbench#293); disable both.
-# (aceapex uses alignment-safe loads since ax_align.h and builds everywhere.)
+# On 32-bit ARM (armv5/v7): bsc crashes in its multithreaded decompress path
+# (lzbench#293); disable it. (aceapex uses alignment-safe loads since ax_align.h,
+# and memlz since 0.5 beta, so both build everywhere.)
 ifneq (,$(filter arm armeb armv%,$(TARGET_ARCH)))
-    DONT_BUILD_MEMLZ ?= 1
     DONT_BUILD_BSC ?= 1
 endif
 
@@ -1243,7 +1242,7 @@ $(LBZIP2_FILES): %.o : %.c
 
 $(BZIP3_FILES): %.o : %.c
 	@$(MKDIR) $(dir $@)
-	$(CC) $(CFLAGS) -DVERSION=\"1.5.3\" -Ibwt/bzip3/include $< -c -o $@
+	$(CC) $(CFLAGS) -DVERSION=\"1.5.4\" -Ibwt/bzip3/include $< -c -o $@
 
 $(CSC_FILES): %.o : %.cpp
 	@$(MKDIR) $(dir $@)
