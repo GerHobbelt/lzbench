@@ -60,7 +60,7 @@ sources, the Notes column says so.
 
 | Compressor | Last update | Notes |
 | :--- | :--- | :--- |
-| [aceapex 1.0.1](https://github.com/yasha1971-coder/aceapex) | 2026-07-30 | Fixed in lzbench: double-free on empty compression streams |
+| [aceapex 2.2.2](https://github.com/yasha1971-coder/aceapex) | 2026-10-01 | |
 | [brieflz 1.3.0](https://github.com/jibsen/brieflz) | 2020-02-15 | |
 | [brotli 1.2.0](https://github.com/google/brotli) | 2025-10-27 | |
 | [bsc 3.3.12](https://github.com/IlyaGrebnov/libbsc) | 2025-09-10 | Disabled on 32-bit ARM — multithreaded decompress faults (SIGBUS, lzbench#293) |
@@ -72,12 +72,12 @@ sources, the Notes column says so.
 | [fast-lzma2 1.0.1](https://github.com/conor42/fast-lzma2) | 2019-05-06 | |
 | [glza 0.12](https://encode.su/threads/2427-GLZA) | 2026-03-23 | |
 | [gpucompact 1.1](https://github.com/UDPSendToFailed/gpucompact) | 2026-08-14 | CUDA only |
-| [kanzi 2.5.3](https://github.com/flanglet/kanzi-cpp) | 2026-04-22 | |
+| [kanzi 2.6.0](https://github.com/flanglet/kanzi-cpp) | 2026-09-26 | |
 | [lbzip2 2.6.5](https://github.com/caius72/lbzip2) | 2026-08-18 | bzip2 format; benchmarked single-threaded |
 | [libdeflate v1.26](https://github.com/ebiggers/libdeflate) | 2026-08-22 | |
 | [lizard v2.1](https://github.com/inikep/lizard) | 2025-01-26 | |
 | [lz4/lz4hc v1.10.0](https://github.com/lz4/lz4) | 2024-07-21 | |
-| [lzav 5.17](https://github.com/avaneev/lzav) | 2026-07-29 | |
+| [lzav 5.18](https://github.com/avaneev/lzav) | 2026-10-01 | |
 | [lzf 3.6](http://software.schmorp.de/pkg/liblzf.html) | 2014-03-13 | |
 | [lzfse/lzvn 1.0](https://github.com/lzfse/lzfse) | 2017-03-08 | |
 | [lzg 1.0.10](https://github.com/mbitsnbites/liblzg) | 2018-11-29 | |
