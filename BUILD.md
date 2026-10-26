@@ -85,6 +85,22 @@ of problems, particular compressor can be excluded from build by setting
 	make DONT_BUILD_GLZA=1
 
 
+AOCL-Compression is disabled by default. Enable its `aocl-` codecs with:
+
+	make DONT_BUILD_AOCL=0
+
+AOCL-Compression is supported only for x86-64 Linux builds and
+requires GNU binutils (`nm` and `objcopy`). If these requirements are not met,
+AOCL codecs are skipped and the rest of lzbench is built normally.
+
+Enabling AOCL also enlarges the output buffer of every codec, not only the
+`aocl-` ones: AOCL's LZMA does not check the output size and needs
+`n + n/6 + 16 KB` for an `n`-byte chunk, so the bound becomes `n + n/6` plus a
+16 KB pad per chunk instead of `n + n/8` plus 1 KB. With small blocks (`-b`)
+this takes much more memory, and a codec that only just fits on incompressible
+data may then pass where a default build reports an error.
+
+
 CUDA support
 -------------------------
 

@@ -62,6 +62,56 @@ int64_t lzbench_mbrotli_decompress(char *inbuf, size_t insize, char *outbuf, siz
 
 
 
+#ifndef BENCH_REMOVE_GOBRRR
+// work_mem stores a Go cgo.Handle.
+extern "C" {
+uintptr_t gobrrr_init(int level);
+void gobrrr_deinit(uintptr_t h);
+int64_t gobrrr_compress(uintptr_t h, uint8_t* src, size_t srcLen, uint8_t* dst, size_t dstCap);
+int64_t gobrrr_decompress(uintptr_t h, uint8_t* src, size_t srcLen, uint8_t* dst, size_t dstCap);
+}
+
+char* lzbench_gobrrr_init(size_t insize, size_t level, size_t)
+{
+    return (char*)gobrrr_init((int)level);
+}
+
+void lzbench_gobrrr_deinit(char* workmem)
+{
+    if (workmem) gobrrr_deinit((uintptr_t)workmem);
+}
+
+int64_t lzbench_gobrrr_compress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
+{
+    return gobrrr_compress((uintptr_t)codec_options->work_mem, (uint8_t*)inbuf, insize, (uint8_t*)outbuf, outsize);
+}
+
+int64_t lzbench_gobrrr_decompress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
+{
+    return gobrrr_decompress((uintptr_t)codec_options->work_mem, (uint8_t*)inbuf, insize, (uint8_t*)outbuf, outsize);
+}
+#endif // BENCH_REMOVE_GOBRRR
+
+
+
+#ifndef BENCH_REMOVE_MZSTD
+#include "mzstd/mzstd-ffi/include/mzstd.h"
+
+int64_t lzbench_mzstd_compress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
+{
+    size_t actual_osize = outsize;
+    return mzstd_compress((const uint8_t*)inbuf, insize, (uint8_t*)outbuf, &actual_osize, codec_options->level) == MZSTD_OK ? actual_osize : 0;
+}
+int64_t lzbench_mzstd_decompress(char *inbuf, size_t insize, char *outbuf, size_t outsize, codec_options_t *codec_options)
+{
+    size_t actual_osize = outsize;
+    return mzstd_decompress((const uint8_t*)inbuf, insize, (uint8_t*)outbuf, &actual_osize) == MZSTD_OK ? actual_osize : 0;
+}
+
+#endif // BENCH_REMOVE_MZSTD
+
+
+
 #ifndef BENCH_REMOVE_FASTLZMA2
 #include "lz+entropy/fast-lzma2/fast-lzma2.h"
 
@@ -1236,7 +1286,6 @@ int64_t lzbench_zstd_LDM_compress(char *inbuf, size_t insize, char *outbuf, size
 typedef struct {
     zxc_cctx *cctx;
     zxc_dctx *dctx;
-    int level;
 } zxc_bench_t;
 
 char *lzbench_zxc_init(size_t insize, size_t level, size_t)
@@ -1245,23 +1294,9 @@ char *lzbench_zxc_init(size_t insize, size_t level, size_t)
     if (!bench)
         return NULL;
 
-    bench->level = (int)level;
-
     zxc_compress_opts_t copts = {0};
     copts.level = (int)level;
-
-    /* ZXC block_size must be a power of 2 in [4KB, 2MB].
-     * Valid values:  4096  (4KB)    1 << 12
-     *                8192  (8KB)    1 << 13
-     *               16384  (16KB)   1 << 14
-     *               32768  (32KB)   1 << 15
-     *               65536  (64KB)   1 << 16
-     *              131072  (128KB)  1 << 17
-     *              262144  (256KB)  1 << 18
-     *              524288  (512KB)  1 << 19  (default)
-     *             1048576  (1MB)    1 << 20
-     *             2097152  (2MB)    1 << 21
-     * Set to 0 to use the default (512KB). */
+    /* 0 = default block size (512KB); otherwise a power of 2 in [4KB, 2MB]. */
     copts.block_size = 0;
 
     bench->cctx = zxc_create_cctx(&copts);

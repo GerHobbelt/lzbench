@@ -61,6 +61,7 @@ sources, the Notes column says so.
 | Compressor | Last update | Notes |
 | :--- | :--- | :--- |
 | [aceapex 2.2.2](https://github.com/yasha1971-coder/aceapex) | 2026-10-01 | |
+| [aocl-compression 5.3.2](https://github.com/amd/aocl-compression/releases/tag/5.3.2) | 2026-08-20 | Disabled by default; enable with `make DONT_BUILD_AOCL=0`. Linux x86-64 only — AMD-optimized lz4/lz4hc/lzma/bzip2/snappy/zlib/zstd (compression prefixed `aocl-`); requires GNU binutils (`nm`, `objcopy`); license: BSD 3-Clause / MIT / NCSA |
 | [brieflz 1.3.0](https://github.com/jibsen/brieflz) | 2020-02-15 | |
 | [brotli 1.2.0](https://github.com/google/brotli) | 2025-10-27 | |
 | [bsc 3.3.12](https://github.com/IlyaGrebnov/libbsc) | 2025-09-10 | Disabled on 32-bit ARM — multithreaded decompress faults (SIGBUS, lzbench#293) |
@@ -71,6 +72,7 @@ sources, the Notes column says so.
 | [fastlz 0.5.0](https://github.com/ariya/FastLZ) | 2020-02-02 | |
 | [fast-lzma2 1.0.1](https://github.com/conor42/fast-lzma2) | 2019-05-06 | |
 | [glza 0.12](https://encode.su/threads/2427-GLZA) | 2026-03-23 | |
+| [go-brrr 1.3.0](https://github.com/molecule-man/go-brrr) | 2026-10-11 | Brotli in Go. Requires [Go](https://go.dev) 1.22+. Skips 32-bit, cross and Windows builds. Uses `lz+entropy/gobrrr/ffi/ffi.go` for the C archive. Vendor copy omits tests, tools and `golang.org/x/tools`. |
 | [gpucompact 1.1](https://github.com/UDPSendToFailed/gpucompact) | 2026-08-14 | CUDA only |
 | [kanzi 2.6.0](https://github.com/flanglet/kanzi-cpp) | 2026-09-26 | |
 | [lbzip2 2.6.5](https://github.com/caius72/lbzip2) | 2026-08-18 | bzip2 format; benchmarked single-threaded |
@@ -87,9 +89,10 @@ sources, the Notes column says so.
 | [lzma v26.03](http://7-zip.org) | 2026-09-03 | |
 | [lzo 2.10](http://www.oberhumer.com/opensource/lzo) | 2017-03-01 | |
 | [lzsse 2019-04-18 (1847c3e827)](https://github.com/ConorStokes/LZSSE) | 2019-04-18 | 64-bit x86 only — requires SSE4.1 (Windows: MinGW-w64 only); lzsse8fast has a [bug](https://github.com/ConorStokes/LZSSE/issues/14) |
-| [mbrotli 0.5.2](https://github.com/Mnwa/mbrotli) | 2026-09-26 | Requires the Rust toolchain 1.89+ (skipped for 32-bit, cross-compiled and Windows builds). Built through the `mbrotli-ffi` C ABI; manifests trimmed in lzbench (no dev-dependencies, rlib only) |
+| [mbrotli 0.5.15](https://github.com/M-Compressors/mbrotli) | 2026-10-14 | Requires the Rust toolchain 1.89+ (skipped for 32-bit, cross-compiled and Windows builds). Built through the `mbrotli-ffi` C ABI; manifests trimmed in lzbench (no dev-dependencies, rlib only) |
 | [memlz 0.5 beta](https://github.com/rrrlasse/memlz) | 2026-09-24 | Patched in lzbench: SSE4.2 target attribute also applied for MinGW (`memlz.h`) |
 | [misa77 0.6.0](https://github.com/welcome-to-the-sunny-side/misa77) | 2026-07-30 | Little-endian 64-bit only — needs a C++20 compiler (GCC 10+, Clang 12+); skipped automatically |
+| [mzstd 0.2.5](https://github.com/M-Compressors/mzstd) | 2026-10-15 | Requires the Rust toolchain 1.89+ (skipped for 32-bit, cross-compiled and Windows builds). Built through the `mzstd-ffi` C ABI; manifests trimmed in lzbench (no dev-dependencies, rlib only) |
 | [nvcomp 2.2.0](https://github.com/NVIDIA/nvcomp) | 2022-02-07 | CUDA only — built with `make ENABLE_CUDA=1`; not in the default CI matrix |
 | [openzl 0.2.3](https://openzl.org/) | 2026-07-28 | 64-bit only — upstream does not support 32-bit builds |
 | [ppmd8 26.03](http://7-zip.org) | 2026-09-03 | |
@@ -109,7 +112,7 @@ sources, the Notes column says so.
 | [zling 2018-10-12](https://github.com/richox/libzling) | 2018-10-12 | Build fixed in lzbench (missing `<functional>` include). Disabled on big-endian PowerPC; not recommended for production use (per author) |
 | [zpaq 7.15](https://github.com/zpaq/zpaq) | 2016-08-17 | Slower on non-x86 — built with `-DNOJIT` (x86-only JIT, portable interpreter elsewhere) |
 | [zstd 1.5.7](https://github.com/facebook/zstd) | 2025-02-19 | |
-| [zxc 0.14.1](https://github.com/hellobertrand/zxc) | 2026-09-20 | |
+| [zxc 0.15.0](https://github.com/hellobertrand/zxc) | 2026-10-13 | |
 
 **Warning**: The compressors listed below have security issues and/or are no longer maintained.
 
